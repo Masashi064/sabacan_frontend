@@ -1,50 +1,51 @@
+// app/auth/callback/CallbackClient.tsx
 "use client";
 
-import * as React from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/client";
+
+// ここはあなたの既存のsupabaseクライアント生成に合わせてください
+// 例: import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function CallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = React.useState("Completing sign-in…");
+  const [message, setMessage] = useState("Signing you in...");
 
-  React.useEffect(() => {
+  useEffect(() => {
     const run = async () => {
       try {
-        const error = searchParams.get("error");
-        const errorDesc = searchParams.get("error_description");
-        if (error) {
-          setMessage(errorDesc ?? error);
+        // SupabaseのPKCE/Auth Code Flow想定（あなたの実装に合わせて調整）
+        const code = searchParams.get("code");
+        const next = searchParams.get("next") || "/";
+
+        if (!code) {
+          setMessage("Missing auth code. Please try again.");
           return;
         }
 
-        // Supabase OAuth(PKCE) の callback は通常 `?code=...`
-        const code = searchParams.get("code");
-        if (code) {
-          const supabase = supabaseBrowser();
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error(error);
+          setMessage("Sign-in failed. Please try again.");
+          return;
         }
 
-        // サインイン後の遷移先（好みで /account か /）
-        router.replace("/account");
-        router.refresh();
-      } catch (e: any) {
-        setMessage(e?.message ?? "Failed to sign in.");
+        router.replace(next);
+      } catch (e) {
+        console.error(e);
+        setMessage("Unexpected error. Please try again.");
       }
     };
 
     run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, searchParams]);
 
-  return (
-    <main className="mx-auto max-w-md px-6 py-16">
-      <div className="rounded-xl border bg-white p-6">
-        <div className="text-lg font-semibold">Auth Callback</div>
-        <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-      </div>
-    </main>
-  );
+  return <div className="p-6">{message}</div>;
 }

@@ -1,23 +1,10 @@
+// app/auth/callback/page.tsx
 import { Suspense } from "react";
 import CallbackClient from "./CallbackClient";
 
-export const dynamic = "force-dynamic"; // ★これで静的プリレンダーから外す
-export const revalidate = 0;
-
-export default function AuthCallbackPage() {
+export default function Page() {
   return (
-    <Suspense
-      fallback={
-        <main className="mx-auto max-w-md px-6 py-16">
-          <div className="rounded-xl border bg-white p-6">
-            <div className="text-lg font-semibold">Signing you in…</div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Please wait a moment.
-            </p>
-          </div>
-        </main>
-      }
-    >
+    <Suspense fallback={<div className="p-6">Signing you in...</div>}>
       <CallbackClient />
     </Suspense>
   );
