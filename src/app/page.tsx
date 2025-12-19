@@ -1,7 +1,9 @@
-import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ArticleCard, type ArticleCardData } from "@/components/ArticleCard";
+import type { ArticleCardData } from "@/components/ArticleCard";
 import { ArticleFilters } from "@/components/ArticleFilters";
+import { HomeHeader } from "@/components/home/HomeHeader";
+import { MobileFiltersSheet } from "@/components/home/MobileFiltersSheet";
+import { ArticleGrid } from "@/components/home/ArticleGrid";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +53,7 @@ export default async function Home({
   const channel = (sp.channel ?? "all").trim();
   const category = (sp.category ?? "all").trim();
   const level = (sp.level ?? "all").trim();
-  const completion = (sp.completion ?? "all") as
-    | "all"
-    | "complete"
-    | "incomplete";
+  const completion = (sp.completion ?? "all") as "all" | "complete" | "incomplete";
 
   // ---- filter options (Channel/Category/Level) ----
   const { data: optRows } = await supabase
@@ -62,19 +61,14 @@ export default async function Home({
     .select("channel_name, assigned_category, assigned_level")
     .limit(5000);
 
-  const channelOptions = uniqSorted(
-    (optRows ?? []).map((r: any) => r.channel_name)
-  );
-  const categoryOptions = uniqSorted(
-    (optRows ?? []).map((r: any) => r.assigned_category)
-  );
+  const channelOptions = uniqSorted((optRows ?? []).map((r: any) => r.channel_name));
+  const categoryOptions = uniqSorted((optRows ?? []).map((r: any) => r.assigned_category));
   const levelOptions = uniqSorted((optRows ?? []).map((r: any) => r.assigned_level));
 
-  // ---- build base filter (without completion) ----
-  function buildBase() {
-    let qb = supabase.from("categories").select("*");
+  // ---- base query builder ----
+  function buildBase(selectClause: string) {
+    let qb = supabase.from("categories").select(selectClause);
 
-    // 1) search / filters FIRST
     if (q) {
       qb = qb.or(`video_title.ilike.%${q}%,channel_name.ilike.%${q}%`);
     }
@@ -82,26 +76,14 @@ export default async function Home({
     if (category !== "all") qb = qb.eq("assigned_category", category);
     if (level !== "all") qb = qb.eq("assigned_level", level);
 
-    // 2) completion filter（ここに入れる：まだ order/range 前）
-    // if (completion === "complete") { ... }
-    // if (completion === "incomplete") { ... }
-
-    // 3) sort AFTER filters
-    qb = qb.order(sort, { ascending: order === "asc" });
-
-    // 4) paging LAST（使ってるなら）
-    // qb = qb.range(from, to);
-
     return qb;
   }
-
 
   // ---- completion filter uses quiz+vocab presence by slug ----
   let slugFilter: string[] | null = null;
 
   if (completion !== "all") {
-    const { data: slugRows, error: slugErr } = await buildBase()
-      .select("slug")
+    const { data: slugRows, error: slugErr } = await buildBase("slug")
       .limit(5000);
 
     if (!slugErr) {
@@ -130,67 +112,32 @@ export default async function Home({
     }
   }
 
-  // ---- final query ----
-  let query = buildBase()
-    .select(
+  // ---- fetch categories (articles) ----
+  let rows: CategoryRow[] = [];
+  let fetchError: string | null = null;
+
+  if (slugFilter && slugFilter.length === 0) {
+    rows = [];
+  } else {
+    let qb = buildBase(
       "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
-    )
-    .order(sort, { ascending: order === "asc" })
-    .limit(60);
+    );
 
-  if (slugFilter) {
-    // no results early
-    if (slugFilter.length === 0) {
-      return (
-        <main className="mx-auto max-w-6xl p-6 space-y-6">
-          <header className="space-y-2">
-            <h1 className="text-2xl font-semibold">Sabacan365</h1>
-            <p className="text-sm text-muted-foreground">
-              English listening quizzes from real videos.
-            </p>
-          </header>
+    if (slugFilter) qb = qb.in("slug", slugFilter);
 
-          <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-            <aside className="lg:sticky lg:top-6 h-fit">
-              <ArticleFilters
-                channelOptions={channelOptions}
-                categoryOptions={categoryOptions}
-                levelOptions={levelOptions}
-              />
-            </aside>
-
-            <section className="text-sm text-muted-foreground">
-              No results.
-            </section>
-          </div>
-        </main>
-      );
-    }
-
-    query = supabase
-      .from("categories")
-      .select(
-        "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
-      )
-      .in("slug", slugFilter)
+    const { data, error } = await qb
       .order(sort, { ascending: order === "asc" })
       .limit(60);
+
+    if (error) {
+      fetchError = error.message;
+      rows = [];
+    } else {
+      rows = (data as CategoryRow[]) ?? [];
+    }
   }
 
-  const { data, error } = await query;
-
-  if (error) {
-    return (
-      <main className="mx-auto max-w-6xl p-6 space-y-4">
-        <h1 className="text-2xl font-semibold">Sabacan365</h1>
-        <pre className="rounded-lg border p-4 text-sm overflow-auto">
-          {JSON.stringify(error, null, 2)}
-        </pre>
-      </main>
-    );
-  }
-
-  const articles: ArticleCardData[] = (data as CategoryRow[]).map((row) => ({
+  const articles: ArticleCardData[] = rows.map((row) => ({
     slug: row.slug,
     videoTitle: row.video_title ?? row.slug,
     channelName: row.channel_name,
@@ -203,15 +150,20 @@ export default async function Home({
 
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">Sabacan365</h1>
-        <p className="text-sm text-muted-foreground">
-          English listening quizzes from real videos.
-        </p>
-      </header>
+      <HomeHeader />
+
+      {/* ✅ Mobile/Tablet: Filters button only (Sheet) */}
+      <div className="lg:hidden">
+        <MobileFiltersSheet
+          channelOptions={channelOptions}
+          categoryOptions={categoryOptions}
+          levelOptions={levelOptions}
+        />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <aside className="lg:sticky lg:top-6 h-fit">
+        {/* ✅ Desktop: sidebar filters */}
+        <aside className="hidden lg:block lg:sticky lg:top-6 h-fit">
           <ArticleFilters
             channelOptions={channelOptions}
             categoryOptions={categoryOptions}
@@ -219,12 +171,16 @@ export default async function Home({
           />
         </aside>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {articles.map((a) => (
-            <ArticleCard key={a.slug} article={a} href={`/articles/${a.slug}`} />
-          ))}
-        </section>
+        <div className="space-y-4">
+          {fetchError ? (
+            <section className="rounded-xl border bg-white p-6">
+              <h2 className="text-lg font-semibold">Error</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{fetchError}</p>
+            </section>
+          ) : null}
 
+          <ArticleGrid items={articles} />
+        </div>
       </div>
     </main>
   );

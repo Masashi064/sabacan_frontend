@@ -2,6 +2,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
+import { StartWatchingButton } from "@/components/learning/StartWatchingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -144,7 +145,13 @@ export default async function ArticlePage({
       {/* YouTube */}
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Video</h2>
-        <div className="aspect-video w-full overflow-hidden rounded-xl border bg-muted">
+
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
+          {/* overlay button */}
+          <div className="absolute left-3 top-3 z-10">
+            <StartWatchingButton slug={slug} videoId={c.video_id ?? null} />
+          </div>
+
           {c.video_id ? (
             <iframe
               className="h-full w-full"
@@ -161,10 +168,11 @@ export default async function ArticlePage({
         </div>
       </section>
 
+
       {/* Quiz */}
       <section>
         {quizList.length > 0 ? (
-          <QuizSection quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
+          <QuizSection quiz={quizList} slug={slug} videoId={category?.video_id ?? null} />
         ) : (
           <Card>
             <CardHeader>

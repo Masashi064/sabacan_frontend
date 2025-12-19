@@ -11,6 +11,45 @@ export type QuizQuestion = {
   explanation?: string;
 };
 
+const STUDY_CAP_SECONDS = 45 * 60; // 2700 (safety cap)
+
+async function computeStudySeconds({
+  supabase,
+  slug,
+  fallbackQuizSeconds,
+}: {
+  supabase: any;
+  slug: string;
+  fallbackQuizSeconds: number;
+}) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return fallbackQuizSeconds;
+
+  const { data, error } = await supabase
+    .from("learning_events")
+    .select("occurred_at")
+    .eq("user_id", user.id)
+    .eq("slug", slug)
+    .eq("event_type", "video_start")
+    .order("occurred_at", { ascending: false })
+    .limit(1);
+
+  if (error) return fallbackQuizSeconds;
+
+  const startedAt = data?.[0]?.occurred_at ? new Date(data[0].occurred_at) : null;
+  if (!startedAt) return fallbackQuizSeconds;
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - startedAt.getTime()) / 1000);
+
+  if (!Number.isFinite(diffSec) || diffSec <= 0) return fallbackQuizSeconds;
+
+  return Math.min(diffSec, STUDY_CAP_SECONDS);
+}
+
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -27,15 +66,15 @@ export function QuizSection({
   const supabase = React.useMemo(() => supabaseBrowser(), []);
   const [selected, setSelected] = React.useState<Record<number, string>>({});
 
-  // 進捗
+  // progress
   const answeredCount = Object.keys(selected).length;
   const correctCount = quiz.reduce((acc, q, i) => {
     const s = selected[i];
     return acc + (s && s === q.answer ? 1 : 0);
   }, 0);
 
-  // 保存用（初回回答〜全問回答までの時間をクイズ所要時間として扱う）
-  const startedAtMsRef = React.useRef<number | null>(null);
+  // fallback: first answer -> finished
+  const firstAnswerAtMsRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
 
   const [saveStatus, setSaveStatus] = React.useState<
@@ -47,16 +86,28 @@ export function QuizSection({
     if (submittedRef.current) return;
     submittedRef.current = true;
 
-    // ログインしてなければスキップ（UIは動く）
+    // If not logged in, skip saving
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
     if (userErr || !userRes?.user) {
       setSaveStatus("skipped");
       return;
     }
 
-    const now = new Date();
-    const startedMs = startedAtMsRef.current ?? Date.now();
-    const durationSeconds = Math.max(0, Math.round((Date.now() - startedMs) / 1000));
+    const completedAt = new Date();
+
+    // Fallback seconds = first answer -> complete
+    const fallbackStartedMs = firstAnswerAtMsRef.current ?? Date.now();
+    const fallbackSeconds = Math.max(
+      0,
+      Math.round((Date.now() - fallbackStartedMs) / 1000)
+    );
+
+    // ✅ Main: video_start -> complete (with cap), fallback if not found
+    const durationSeconds = await computeStudySeconds({
+      supabase,
+      slug,
+      fallbackQuizSeconds: fallbackSeconds,
+    });
 
     setSaveStatus("saving");
     setSaveError(null);
@@ -67,9 +118,9 @@ export function QuizSection({
       video_id: videoId,
       total_questions: quiz.length,
       correct_count: correctCount,
-      started_at: new Date(startedMs).toISOString(),
-      completed_at: now.toISOString(),
-      duration_seconds: durationSeconds,
+      started_at: new Date(fallbackStartedMs).toISOString(), // (optional) first-answer time as metadata
+      completed_at: completedAt.toISOString(),
+      duration_seconds: durationSeconds, // ✅ learning time definition
     });
 
     if (error) {
@@ -81,7 +132,7 @@ export function QuizSection({
     setSaveStatus("saved");
   }
 
-  // 全問回答した瞬間に保存（1回だけ）
+  // Save the moment all questions are answered
   React.useEffect(() => {
     if (quiz.length === 0) return;
     if (answeredCount !== quiz.length) return;
@@ -99,7 +150,6 @@ export function QuizSection({
           </p>
         </div>
 
-        {/* 保存ステータス（小さく表示） */}
         <div className="text-xs text-muted-foreground text-right">
           {saveStatus === "idle" ? null : saveStatus === "saving" ? (
             <span>Saving…</span>
@@ -130,6 +180,7 @@ export function QuizSection({
                 <CardTitle className="text-base">
                   Q{idx + 1}. {q.question}
                 </CardTitle>
+
                 {!isAnswered ? (
                   <p className="text-sm text-muted-foreground">Choose an answer.</p>
                 ) : isCorrect ? (
@@ -163,11 +214,11 @@ export function QuizSection({
                         type="button"
                         className={cn(base, state)}
                         onClick={() => {
-                          if (isAnswered) return; // 1回回答したら固定（仕様どおり）
+                          if (isAnswered) return; // lock after first pick
 
-                          // 初回回答で開始時刻を記録
-                          if (startedAtMsRef.current === null) {
-                            startedAtMsRef.current = Date.now();
+                          // fallback timer start (first answer)
+                          if (firstAnswerAtMsRef.current === null) {
+                            firstAnswerAtMsRef.current = Date.now();
                           }
 
                           setSelected((prev) => ({ ...prev, [idx]: choice }));
@@ -176,7 +227,9 @@ export function QuizSection({
                         <div className="flex items-start justify-between gap-3">
                           <span>{choice}</span>
                           {isAnswered && correct ? (
-                            <span className="text-emerald-700 font-medium">Answer</span>
+                            <span className="text-emerald-700 font-medium">
+                              Answer
+                            </span>
                           ) : null}
                         </div>
                       </button>
