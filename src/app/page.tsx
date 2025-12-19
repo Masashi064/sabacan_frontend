@@ -139,7 +139,7 @@ export default async function Home({
       fetchError = error.message;
       rows = [];
     } else {
-      rows = (data as CategoryRow[]) ?? [];
+      rows = ((data as unknown) as CategoryRow[]) ?? [];
     }
   }
 
