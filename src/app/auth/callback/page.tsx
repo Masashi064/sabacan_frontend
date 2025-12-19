@@ -1,37 +1,24 @@
-"use client";
+import { Suspense } from "react";
+import CallbackClient from "./CallbackClient";
 
-import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/lib/supabase/client";
+export const dynamic = "force-dynamic"; // ★これで静的プリレンダーから外す
+export const revalidate = 0;
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
-  const sp = useSearchParams();
-
-  useEffect(() => {
-    const code = sp.get("code");
-    const next = sp.get("next") || "/";
-
-    if (!code) {
-      router.replace("/login");
-      return;
-    }
-
-    (async () => {
-      const supabase = supabaseBrowser();
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        console.error(error);
-        router.replace("/login");
-        return;
-      }
-      router.replace(next);
-    })();
-  }, [router, sp]);
-
   return (
-    <main className="mx-auto max-w-md p-6">
-      <p className="text-sm text-muted-foreground">Signing you in…</p>
-    </main>
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-md px-6 py-16">
+          <div className="rounded-xl border bg-white p-6">
+            <div className="text-lg font-semibold">Signing you in…</div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please wait a moment.
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <CallbackClient />
+    </Suspense>
   );
 }
