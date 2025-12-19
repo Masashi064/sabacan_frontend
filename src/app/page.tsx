@@ -87,7 +87,9 @@ export default async function Home({
       .limit(5000);
 
     if (!slugErr) {
-      const candidates = (slugRows as Array<{ slug: string }>).map((r) => r.slug);
+      const candidates = (slugRows ?? [])
+      .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
+      .map((r) => r.slug);
 
       const [{ data: quizRows }, { data: vocabRows }] = await Promise.all([
         supabase.from("quiz").select("slug").limit(10000),
