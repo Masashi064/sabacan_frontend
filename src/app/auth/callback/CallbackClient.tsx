@@ -1,11 +1,7 @@
-// app/auth/callback/CallbackClient.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-
-// ここはあなたの既存のsupabaseクライアント生成に合わせてください
-// 例: import { supabase } from "@/lib/supabase/client";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -21,23 +17,38 @@ export default function CallbackClient() {
   useEffect(() => {
     const run = async () => {
       try {
-        // SupabaseのPKCE/Auth Code Flow想定（あなたの実装に合わせて調整）
         const code = searchParams.get("code");
         const next = searchParams.get("next") || "/";
 
-        if (!code) {
-          setMessage("Missing auth code. Please try again.");
+        // ✅ code がある → セッション交換して進む
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error(error);
+            setMessage("Sign-in failed. Please try again.");
+            return;
+          }
+          router.replace(next);
           return;
         }
 
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        // ✅ code がない → でもログイン済みなら進む（ここが今回の修正ポイント）
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) {
           console.error(error);
-          setMessage("Sign-in failed. Please try again.");
+        }
+
+        if (session) {
+          router.replace(next);
           return;
         }
 
-        router.replace(next);
+        // ❌ 未ログインで code もない → ログインへ戻す
+        router.replace("/login?error=missing_code");
       } catch (e) {
         console.error(e);
         setMessage("Unexpected error. Please try again.");
