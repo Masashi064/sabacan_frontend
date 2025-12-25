@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Download, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ type PerformanceOverviewRow = {
 };
 
 type StreakRow = {
-  user_id: string;
+  user_id: string | null;
   last_active_day: string | null;
   current_streak: number;
   longest_streak: number;
@@ -91,13 +91,6 @@ function secondsToHms(totalSeconds: number) {
   return `${ss}s`;
 }
 
-function csvEscape(v: unknown) {
-  const s = String(v ?? "");
-  const needs = /[",\n]/.test(s);
-  const escaped = s.replace(/"/g, '""');
-  return needs ? `"${escaped}"` : escaped;
-}
-
 export default function AccountPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
@@ -115,7 +108,6 @@ export default function AccountPage() {
   const [calendar90, setCalendar90] = React.useState<CalendarDailyFilledRow[]>([]);
 
   const [recentFav, setRecentFav] = React.useState<FavoriteWordRow[]>([]);
-  const [csvBusy, setCsvBusy] = React.useState(false);
 
   async function loadAll() {
     setError(null);
@@ -208,60 +200,6 @@ export default function AccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function downloadFavoritesCsv() {
-    if (!userId) return;
-    setCsvBusy(true);
-
-    const { data, error: favErr } = await supabase
-      .from("favorite_words")
-      .select("word,pronunciation,definition,example,slug,video_id,created_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-
-    setCsvBusy(false);
-
-    if (favErr) {
-      setError(`CSV export failed: ${favErr.message}`);
-      return;
-    }
-
-    const rows = (data ?? []) as FavoriteWordRow[];
-    const header = [
-      "word",
-      "pronunciation",
-      "definition",
-      "example",
-      "slug",
-      "video_id",
-      "created_at",
-    ];
-
-    const lines = [
-      header.join(","),
-      ...rows.map((r) =>
-        [
-          csvEscape(r.word),
-          csvEscape(r.pronunciation ?? ""),
-          csvEscape(r.definition ?? ""),
-          csvEscape(r.example ?? ""),
-          csvEscape(r.slug ?? ""),
-          csvEscape(r.video_id ?? ""),
-          csvEscape(r.created_at),
-        ].join(",")
-      ),
-    ];
-
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sabacan365-favorite-words.csv";
-    a.click();
-
-    URL.revokeObjectURL(url);
-  }
-
   // Calendar intensity (simple levels)
   function calendarCellClass(events: number) {
     if (events <= 0) return "bg-muted/40";
@@ -287,10 +225,6 @@ export default function AccountPage() {
           <Button variant="outline" onClick={loadAll} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
-          </Button>
-          <Button onClick={downloadFavoritesCsv} disabled={csvBusy || loading}>
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
           </Button>
         </div>
       </div>
@@ -348,15 +282,21 @@ export default function AccountPage() {
         <CardContent className="flex flex-wrap items-center gap-6 text-sm">
           <div>
             <div className="text-muted-foreground">Current</div>
-            <div className="text-xl font-semibold">{loading ? "—" : streak?.current_streak ?? 0} days</div>
+            <div className="text-xl font-semibold">
+              {loading ? "—" : streak?.current_streak ?? 0} days
+            </div>
           </div>
           <div>
             <div className="text-muted-foreground">Longest</div>
-            <div className="text-xl font-semibold">{loading ? "—" : streak?.longest_streak ?? 0} days</div>
+            <div className="text-xl font-semibold">
+              {loading ? "—" : streak?.longest_streak ?? 0} days
+            </div>
           </div>
           <div>
             <div className="text-muted-foreground">Last active</div>
-            <div className="text-xl font-semibold">{loading ? "—" : streak?.last_active_day ?? "—"}</div>
+            <div className="text-xl font-semibold">
+              {loading ? "—" : streak?.last_active_day ?? "—"}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -377,14 +317,24 @@ export default function AccountPage() {
                   ...r,
                   dayLabel: formatDate(r.day),
                 }))}
-                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dayLabel" tick={{ fontSize: 12 }} interval={4} />
+                <XAxis
+                  dataKey="dayLabel"
+                  tick={{ fontSize: 12 }}
+                  interval={4}
+                  tickMargin={8}
+                />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip />
                 <Line type="monotone" dataKey="attempts_count" name="Daily" dot={false} />
-                <Line type="monotone" dataKey="attempts_cumulative" name="Cumulative" dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="attempts_cumulative"
+                  name="Cumulative"
+                  dot={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -402,10 +352,15 @@ export default function AccountPage() {
                   ...r,
                   dayLabel: formatDate(r.day),
                 }))}
-                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dayLabel" tick={{ fontSize: 12 }} interval={4} />
+                <XAxis
+                  dataKey="dayLabel"
+                  tick={{ fontSize: 12 }}
+                  interval={4}
+                  tickMargin={8}
+                />
                 <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
                 <Tooltip />
                 <Line type="monotone" dataKey="avg_score_percent" name="Avg Score" dot={false} />
@@ -421,9 +376,7 @@ export default function AccountPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Learning Calendar (Last 90 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Days with activity are highlighted.
-            </p>
+            <p className="text-sm text-muted-foreground">Days with activity are highlighted.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-14 gap-1">
@@ -451,9 +404,7 @@ export default function AccountPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Recent Favorite Words</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Latest 12 favorites (export all via CSV button)
-            </p>
+            <p className="text-sm text-muted-foreground">Latest 12 favorites</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? (
@@ -495,8 +446,8 @@ export default function AccountPage() {
       </div>
 
       <div className="text-xs text-muted-foreground">
-        Learning time is currently based on quiz duration only. We can expand it later
-        (sessions, reading time, vocab review, etc.).
+        Learning time is currently based on quiz duration only. We can expand it later (sessions,
+        reading time, vocab review, etc.).
       </div>
     </main>
   );

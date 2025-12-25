@@ -235,7 +235,7 @@ export function ArticleFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Quizzes</SelectItem>
-            <SelectItem value="complete">Complete (quiz + vocab)</SelectItem>
+            <SelectItem value="complete">Complete (quiz)</SelectItem>
             <SelectItem value="incomplete">Incomplete</SelectItem>
           </SelectContent>
         </Select>

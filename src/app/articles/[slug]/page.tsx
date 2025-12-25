@@ -1,8 +1,8 @@
+import StudyStartMarker from "@/components/learning/StudyStartMarker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
-import { StartWatchingButton } from "@/components/learning/StartWatchingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function ArticlePage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
 
   // ✅ Next.js 16: params は Promise
   const { slug } = await params;
@@ -58,7 +58,6 @@ export default async function ArticlePage({
       .maybeSingle(),
   ]);
 
-  // ✅ ここが「vocabErr を追加する場所」です（catErr, quizErr と同じ段落）
   if (catErr || quizErr || vocabErr) {
     return (
       <main className="mx-auto max-w-4xl p-6 space-y-4">
@@ -115,6 +114,9 @@ export default async function ArticlePage({
 
   return (
     <main className="mx-auto max-w-4xl p-6 space-y-8">
+      {/* ✅ ここで「記事ページに入った瞬間に計測開始」 */}
+      <StudyStartMarker slug={slug} />
+
       <a href="/" className="text-sm underline">
         ← Back
       </a>
@@ -147,11 +149,6 @@ export default async function ArticlePage({
         <h2 className="text-xl font-semibold">Video</h2>
 
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
-          {/* overlay button */}
-          <div className="absolute left-3 top-3 z-10">
-            <StartWatchingButton slug={slug} videoId={c.video_id ?? null} />
-          </div>
-
           {c.video_id ? (
             <iframe
               className="h-full w-full"
@@ -168,11 +165,10 @@ export default async function ArticlePage({
         </div>
       </section>
 
-
       {/* Quiz */}
       <section>
         {quizList.length > 0 ? (
-          <QuizSection quiz={quizList} slug={slug} videoId={category?.video_id ?? null} />
+          <QuizSection quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
         ) : (
           <Card>
             <CardHeader>
@@ -188,12 +184,7 @@ export default async function ArticlePage({
       {/* Vocabulary */}
       <section>
         {vocabItems.length > 0 ? (
-          <VocabularySection
-            items={vocabItems}
-            slug={slug}
-            videoId={category?.video_id ?? null}
-          />
-
+          <VocabularySection items={vocabItems} slug={slug} videoId={c.video_id ?? null} />
         ) : (
           <Card>
             <CardHeader>

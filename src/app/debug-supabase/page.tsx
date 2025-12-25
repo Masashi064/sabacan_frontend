@@ -1,30 +1,28 @@
-import { supabaseServer } from "@/lib/supabase/server";
+// src/app/debug-supabase/page.tsx
 
-export const dynamic = "force-dynamic";
+import { supabaseBrowser } from "@/lib/supabase/client";
+
+const TABLE_NAME = "favorite_words"; // ←あなたの元コードに合わせてOK
 
 export default async function DebugSupabasePage() {
-  const supabase = supabaseServer();
-
-  const TABLE_NAME = "quiz"; // ←実在テーブル名に変更
+  const supabase = await supabaseBrowser(); // ✅ await する
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
     .select("*")
     .limit(1);
 
-  return (
-    <main className="p-8 space-y-4">
-      <h1 className="text-xl font-semibold">Supabase Debug</h1>
+  if (error) {
+    return (
+      <main className="p-6">
+        <pre className="text-red-600">{error.message}</pre>
+      </main>
+    );
+  }
 
-      {error ? (
-        <pre className="rounded-lg border p-4 text-sm overflow-auto">
-          {JSON.stringify(error, null, 2)}
-        </pre>
-      ) : (
-        <pre className="rounded-lg border p-4 text-sm overflow-auto">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      )}
+  return (
+    <main className="p-6">
+      <pre className="text-sm">{JSON.stringify(data, null, 2)}</pre>
     </main>
   );
 }
