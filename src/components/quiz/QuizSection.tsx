@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { gaEvent } from "@/lib/ga";
 
 export type QuizQuestion = {
   question: string;
@@ -76,6 +77,7 @@ export function QuizSection({
   // fallback: first answer -> finished
   const firstAnswerAtMsRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
+  const quizCompleteSentRef = React.useRef(false);
 
   const [saveStatus, setSaveStatus] = React.useState<
     "idle" | "saving" | "saved" | "error" | "skipped"
@@ -136,6 +138,11 @@ export function QuizSection({
   React.useEffect(() => {
     if (quiz.length === 0) return;
     if (answeredCount !== quiz.length) return;
+    if (!quizCompleteSentRef.current) {
+      quizCompleteSentRef.current = true;
+      gaEvent("quiz_complete", { slug });
+    }
+
     void saveAttemptOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answeredCount, quiz.length]);
