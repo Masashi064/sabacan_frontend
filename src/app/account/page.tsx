@@ -11,6 +11,8 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  BarChart,
+  Bar,
 } from "recharts";
 import { RefreshCw } from "lucide-react";
 
@@ -308,13 +310,15 @@ export default function AccountPage() {
         </CardContent>
       </Card>
 
+      
+
       {/* Charts */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="h-[360px]">
           <CardHeader>
-            <CardTitle className="text-base">Quiz Attempts (Last 30 days)</CardTitle>
+            <CardTitle className="text-base">Cumulative Quiz Attempts (Last 30 days)</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Daily + cumulative (motivational “upward” view)
+              Running total of quiz attempts
             </p>
           </CardHeader>
           <CardContent className="h-[260px]">
@@ -335,11 +339,46 @@ export default function AccountPage() {
                 />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip />
-                <Line type="monotone" dataKey="attempts_count" name="Daily" dot={false} />
                 <Line
                   type="monotone"
                   dataKey="attempts_cumulative"
-                  name="Cumulative"
+                  name="Cumulative Attempts"
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        
+        <Card className="h-[360px]">
+          <CardHeader>
+            <CardTitle className="text-base">Daily Quiz Attempts (Last 30 days)</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Number of quiz attempts per day
+            </p>
+          </CardHeader>
+          <CardContent className="h-[260px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={attemptsDaily.map((r) => ({
+                  ...r,
+                  dayLabel: formatDate(r.day),
+                }))}
+                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="dayLabel"
+                  tick={{ fontSize: 12 }}
+                  interval={4}
+                  tickMargin={8}
+                />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip />
+                <Line
+                  type="monotone"
+                  dataKey="attempts_count"
+                  name="Daily Attempts"
                   dot={false}
                 />
               </LineChart>
