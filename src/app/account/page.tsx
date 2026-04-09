@@ -81,6 +81,13 @@ function formatDate(yyyy_mm_dd: string) {
   return `${m}/${d}`;
 }
 
+
+function getTodayAttempts(data: AttemptsDailyFilledRow[]) {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayRow = data.find((d) => d.day === today);
+  return todayRow?.attempts_count ?? 0;
+}
+
 function secondsToHms(totalSeconds: number) {
   const s = Math.max(0, totalSeconds | 0);
   const h = Math.floor(s / 3600);
@@ -248,10 +255,10 @@ export default function AccountPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Overall Accuracy</CardTitle>
+            <CardTitle className="text-sm">Today's Attempts</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {loading ? "—" : `${perf?.overall_accuracy_percent ?? 0}%`}
+            {loading ? "—" : getTodayAttempts(attemptsDaily)}
           </CardContent>
         </Card>
 
