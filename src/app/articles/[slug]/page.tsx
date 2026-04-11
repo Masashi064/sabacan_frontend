@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
+import { ReportIssueButton } from "@/components/article/ReportIssueButton";
 
 export const dynamic = "force-dynamic";
 
@@ -196,6 +197,11 @@ export default async function ArticlePage({
           </Card>
         )}
       </section>
+
+      <section>
+        <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
+      </section>
+
     </main>
   );
 }
