@@ -85,9 +85,8 @@ function formatDate(yyyy_mm_dd: string) {
 
 
 function getTodayAttempts(data: AttemptsDailyFilledRow[]) {
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const todayRow = data.find((d) => d.day === today);
-  return todayRow?.attempts_count ?? 0;
+  if (data.length === 0) return 0;
+  return data[data.length - 1]?.attempts_count ?? 0;
 }
 
 function secondsToHms(totalSeconds: number) {
