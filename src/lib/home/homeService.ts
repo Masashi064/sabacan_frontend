@@ -2,9 +2,48 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { HomeData, HomeSearchParams, CategoryRow } from "./types";
 
 function uniqSorted(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.map((v) => (v ?? "").trim()).filter(Boolean))).sort((a, b) =>
-    a.localeCompare(b)
-  );
+  return Array.from(
+    new Set(values.map((v) => (v ?? "").trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+async function fetchAllCategoryOptionRows(supabase: SupabaseClient) {
+  const pageSize = 1000;
+  let from = 0;
+
+  let allRows: Array<{
+    channel_name: string | null;
+    assigned_category: string | null;
+    assigned_level: string | null;
+  }> = [];
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("channel_name, assigned_category, assigned_level")
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows =
+      (data as Array<{
+        channel_name: string | null;
+        assigned_category: string | null;
+        assigned_level: string | null;
+      }> | null) ?? [];
+
+    allRows = allRows.concat(rows);
+
+    if (rows.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return allRows;
 }
 
 export async function getHomeData(
@@ -21,14 +60,22 @@ export async function getHomeData(
   const completion = (sp.completion ?? "all") as "all" | "complete" | "incomplete";
 
   // ---- options ----
-  const { data: optRows } = await supabase
-    .from("categories")
-    .select("channel_name, assigned_category, assigned_level")
-    .limit(5000);
+  let optRows: Array<{
+    channel_name: string | null;
+    assigned_category: string | null;
+    assigned_level: string | null;
+  }> = [];
 
-  const channelOptions = uniqSorted((optRows ?? []).map((r: any) => r.channel_name));
-  const categoryOptions = uniqSorted((optRows ?? []).map((r: any) => r.assigned_category));
-  const levelOptions = uniqSorted((optRows ?? []).map((r: any) => r.assigned_level));
+  try {
+    optRows = await fetchAllCategoryOptionRows(supabase);
+  } catch (error) {
+    console.error("Failed to fetch option rows:", error);
+    optRows = [];
+  }
+
+  const channelOptions = uniqSorted(optRows.map((r) => r.channel_name));
+  const categoryOptions = uniqSorted(optRows.map((r) => r.assigned_category));
+  const levelOptions = uniqSorted(optRows.map((r) => r.assigned_level));
 
   // ---- base query builder ----
   function buildBase(selectClause: string) {
@@ -46,7 +93,7 @@ export async function getHomeData(
   let slugFilter: string[] | null = null;
 
   if (completion !== "all") {
-    const { data: slugRows, error: slugErr } = await buildBase("slug").limit(5000);
+    const { data: slugRows, error: slugErr } = await buildBase("slug").limit(20000);
 
     if (!slugErr) {
       const candidates = ((slugRows ?? []) as unknown[])

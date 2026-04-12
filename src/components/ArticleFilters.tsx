@@ -55,6 +55,9 @@ export function ArticleFilters({
   const router = useRouter();
   const sp = useSearchParams();
 
+  console.log("channelOptions:", channelOptions);
+  console.log("channel count:", channelOptions.length);
+
   const [q, setQ] = React.useState(sp.get("q") ?? "");
   const [sort, setSort] = React.useState(sp.get("sort") ?? "published_date");
   const [order, setOrder] = React.useState(sp.get("order") ?? "desc");
@@ -164,7 +167,7 @@ export function ArticleFilters({
           <SelectTrigger>
             <SelectValue placeholder="All Channels" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-64 overflow-y-auto">
             <SelectItem value="all">All Channels</SelectItem>
             {channelOptions.map((x) => (
               <SelectItem key={x} value={x}>
