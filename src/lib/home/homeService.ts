@@ -36,14 +36,84 @@ async function fetchAllCategoryOptionRows(supabase: SupabaseClient) {
 
     allRows = allRows.concat(rows);
 
-    if (rows.length < pageSize) {
-      break;
-    }
-
+    if (rows.length < pageSize) break;
     from += pageSize;
   }
 
   return allRows;
+}
+
+async function fetchAllSlugs(
+  supabase: SupabaseClient,
+  q: string,
+  channel: string,
+  category: string,
+  level: string
+) {
+  const pageSize = 1000;
+  let from = 0;
+  let allRows: Array<{ slug: string }> = [];
+
+  while (true) {
+    let qb = supabase.from("categories").select("slug");
+
+    if (q) qb = qb.or(`video_title.ilike.%${q}%,channel_name.ilike.%${q}%`);
+    if (channel !== "all") qb = qb.eq("channel_name", channel);
+    if (category !== "all") qb = qb.eq("assigned_category", category);
+    if (level !== "all") qb = qb.eq("assigned_level", level);
+
+    const { data, error } = await qb.range(from, from + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows =
+      ((data ?? []) as unknown[])
+        .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
+        .map((r) => ({ slug: r.slug })) ?? [];
+
+    allRows = allRows.concat(rows);
+
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allRows.map((r) => r.slug);
+}
+
+async function fetchAllCompletedAttemptSlugs(
+  supabase: SupabaseClient,
+  userId: string,
+  candidates: string[]
+) {
+  if (candidates.length === 0) return new Set<string>();
+
+  const chunkSize = 500;
+  const completed = new Set<string>();
+
+  for (let i = 0; i < candidates.length; i += chunkSize) {
+    const chunk = candidates.slice(i, i + chunkSize);
+
+    const { data, error } = await supabase
+      .from("quiz_attempts")
+      .select("slug")
+      .eq("user_id", userId)
+      .in("slug", chunk)
+      .not("completed_at", "is", null);
+
+    if (error) {
+      throw error;
+    }
+
+    for (const row of data ?? []) {
+      if (typeof row?.slug === "string" && row.slug) {
+        completed.add(row.slug);
+      }
+    }
+  }
+
+  return completed;
 }
 
 export async function getHomeData(
@@ -93,12 +163,8 @@ export async function getHomeData(
   let slugFilter: string[] | null = null;
 
   if (completion !== "all") {
-    const { data: slugRows, error: slugErr } = await buildBase("slug").limit(20000);
-
-    if (!slugErr) {
-      const candidates = ((slugRows ?? []) as unknown[])
-        .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
-        .map((r) => r.slug);
+    try {
+      const candidates = await fetchAllSlugs(supabase, q, channel, category, level);
 
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user ?? null;
@@ -106,29 +172,20 @@ export async function getHomeData(
       if (!user) {
         slugFilter = completion === "complete" ? [] : candidates;
       } else {
-        const { data: attemptRows, error: attemptErr } = await supabase
-          .from("quiz_attempts")
-          .select("slug")
-          .eq("user_id", user.id)
-          .in("slug", candidates)
-          .not("completed_at", "is", null)
-          .limit(10000);
+        const completedSet = await fetchAllCompletedAttemptSlugs(
+          supabase,
+          user.id,
+          candidates
+        );
 
-        if (attemptErr) {
-          slugFilter = null;
-        } else {
-          const completedSet = new Set(
-            (attemptRows ?? [])
-              .map((r: any) => (typeof r?.slug === "string" ? r.slug : ""))
-              .filter(Boolean)
-          );
-
-          slugFilter =
-            completion === "complete"
-              ? candidates.filter((s) => completedSet.has(s))
-              : candidates.filter((s) => !completedSet.has(s));
-        }
+        slugFilter =
+          completion === "complete"
+            ? candidates.filter((s) => completedSet.has(s))
+            : candidates.filter((s) => !completedSet.has(s));
       }
+    } catch (error) {
+      console.error("Failed to build completion filter:", error);
+      slugFilter = null;
     }
   }
 
@@ -145,13 +202,15 @@ export async function getHomeData(
 
     if (slugFilter) qb = qb.in("slug", slugFilter);
 
-    const { data, error } = await qb.order(sort, { ascending: order === "asc" }).limit(60);
+    const { data, error } = await qb
+      .order(sort, { ascending: order === "asc" })
+      .limit(60);
 
     if (error) {
       fetchError = error.message;
       rows = [];
     } else {
-      rows = (data as unknown as CategoryRow[]) ?? [];
+      rows = (data as CategoryRow[]) ?? [];
     }
   }
 
