@@ -15,9 +15,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://sabacan365.com";
+const SITE_NAME = "Sabacan365";
+const SITE_DESCRIPTION = "Sabacan365.com English listening quizzes from real videos.";
+const OGP_IMAGE = "/toppage.png";
+
 export const metadata: Metadata = {
-  title: "Sabacan365",
-  description: "Sabacan365.com English listening quizzes from real videos.",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_NAME,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    images: [{ url: OGP_IMAGE, width: 1358, height: 1159, alt: SITE_NAME }],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [OGP_IMAGE],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
