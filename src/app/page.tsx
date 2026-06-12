@@ -45,6 +45,7 @@ export default async function Home({
           channelOptions={channelOptions}
           categoryOptions={categoryOptions}
           levelOptions={levelOptions}
+          initialCount={totalCount}
         />
       </div>
 
