@@ -20,7 +20,7 @@ export default async function Home({
 
   const supabase = await supabaseServer();
 
-  const { channelOptions, categoryOptions, levelOptions, rows, fetchError } =
+  const { channelOptions, categoryOptions, levelOptions, rows, hasMore, fetchError } =
     await getHomeData(supabase, sp);
 
   const articles: ArticleCardData[] = rows.map((row) => ({
@@ -38,7 +38,7 @@ export default async function Home({
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       <HomeHeader />
 
-      {/* ✅ Mobile/Tablet: Filters button only (Sheet) */}
+      {/* Mobile/Tablet: Filters button only (Sheet) */}
       <div className="lg:hidden">
         <MobileFiltersSheet
           channelOptions={channelOptions}
@@ -48,7 +48,7 @@ export default async function Home({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* ✅ Desktop: sidebar filters */}
+        {/* Desktop: sidebar filters */}
         <aside className="hidden lg:block lg:sticky lg:top-6 h-fit">
           <ArticleFilters
             channelOptions={channelOptions}
@@ -65,7 +65,13 @@ export default async function Home({
             </section>
           ) : null}
 
-          <ArticleGrid items={articles} />
+          {/* key causes remount (state reset) whenever filter params change */}
+          <ArticleGrid
+            key={JSON.stringify(sp)}
+            initialItems={articles}
+            initialHasMore={hasMore}
+            searchParams={sp}
+          />
         </div>
       </div>
     </main>

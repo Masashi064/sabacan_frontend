@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseBrowser } from "@/lib/supabase/client";
 
 export default function CallbackClient() {
   const router = useRouter();
@@ -16,11 +11,13 @@ export default function CallbackClient() {
 
   useEffect(() => {
     const run = async () => {
+      // Create the client inside the effect so it is never shared across renders.
+      const supabase = supabaseBrowser();
+
       try {
         const code = searchParams.get("code");
         const next = searchParams.get("next") || "/";
 
-        // ✅ code がある → セッション交換して進む
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
@@ -32,23 +29,15 @@ export default function CallbackClient() {
           return;
         }
 
-        // ✅ code がない → でもログイン済みなら進む（ここが今回の修正ポイント）
+        // No code — redirect if already signed in, otherwise go back to login.
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error(error);
-        }
+        if (error) console.error(error);
 
-        if (session) {
-          router.replace(next);
-          return;
-        }
-
-        // ❌ 未ログインで code もない → ログインへ戻す
-        router.replace("/login?error=missing_code");
+        router.replace(session ? next : "/login?error=missing_code");
       } catch (e) {
         console.error(e);
         setMessage("Unexpected error. Please try again.");

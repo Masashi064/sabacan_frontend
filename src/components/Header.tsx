@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { SearchDialog } from "@/components/SearchDialog";
 
 function getDisplayName(user: User) {
   const md: any = user.user_metadata ?? {};
@@ -79,6 +80,7 @@ export function Header() {
 
         {/* Right */}
         <div className="flex items-center gap-2">
+          <SearchDialog />
           {!user ? (
             <Button asChild>
               <Link href="/login">Login</Link>

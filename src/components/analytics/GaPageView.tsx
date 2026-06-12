@@ -3,12 +3,6 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
-declare global {
-  interface Window {
-    gtag?: (...args: any[]) => void;
-  }
-}
-
 export default function GaPageView() {
   const pathname = usePathname();
 

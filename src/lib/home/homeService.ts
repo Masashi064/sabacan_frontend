@@ -1,46 +1,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { HomeData, HomeSearchParams, CategoryRow } from "./types";
 
-function uniqSorted(values: Array<string | null | undefined>) {
-  return Array.from(
-    new Set(values.map((v) => (v ?? "").trim()).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b));
-}
+export const PAGE_SIZE = 24;
 
-async function fetchAllCategoryOptionRows(supabase: SupabaseClient) {
+// Fetches all distinct non-null values for a single column via paginated queries.
+// Runs in parallel with the other two column fetches, so wall-clock cost is
+// max(ch_time, cat_time, lvl_time) rather than their sum.
+async function fetchDistinctColumn(
+  supabase: SupabaseClient,
+  column: "channel_name" | "assigned_category" | "assigned_level"
+): Promise<string[]> {
   const pageSize = 1000;
+  const seen = new Set<string>();
   let from = 0;
-
-  let allRows: Array<{
-    channel_name: string | null;
-    assigned_category: string | null;
-    assigned_level: string | null;
-  }> = [];
 
   while (true) {
     const { data, error } = await supabase
       .from("categories")
-      .select("channel_name, assigned_category, assigned_level")
+      .select(column)
+      .not(column, "is", null)
       .range(from, from + pageSize - 1);
 
-    if (error) {
-      throw error;
+    if (error) throw error;
+
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const val = row[column];
+      if (typeof val === "string" && val.trim()) seen.add(val.trim());
     }
 
-    const rows =
-      (data as Array<{
-        channel_name: string | null;
-        assigned_category: string | null;
-        assigned_level: string | null;
-      }> | null) ?? [];
-
-    allRows = allRows.concat(rows);
-
-    if (rows.length < pageSize) break;
+    if ((data ?? []).length < pageSize) break;
     from += pageSize;
   }
 
-  return allRows;
+  return Array.from(seen).sort((a, b) => a.localeCompare(b));
 }
 
 async function fetchAllSlugs(
@@ -64,14 +56,11 @@ async function fetchAllSlugs(
 
     const { data, error } = await qb.range(from, from + pageSize - 1);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    const rows =
-      ((data ?? []) as unknown[])
-        .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
-        .map((r) => ({ slug: r.slug })) ?? [];
+    const rows = ((data ?? []) as unknown[])
+      .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
+      .map((r) => ({ slug: r.slug }));
 
     allRows = allRows.concat(rows);
 
@@ -102,9 +91,7 @@ async function fetchAllCompletedAttemptSlugs(
       .in("slug", chunk)
       .not("completed_at", "is", null);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
     for (const row of data ?? []) {
       if (typeof row?.slug === "string" && row.slug) {
@@ -116,68 +103,42 @@ async function fetchAllCompletedAttemptSlugs(
   return completed;
 }
 
-export async function getHomeData(
+// Core row-fetching logic shared between the server page and the API route.
+async function fetchArticleRows(
   supabase: SupabaseClient,
-  sp: HomeSearchParams
-): Promise<HomeData> {
+  sp: HomeSearchParams,
+  page: number,
+  pageSize: number
+): Promise<{ rows: CategoryRow[]; hasMore: boolean; fetchError: string | null }> {
   const q = (sp.q ?? "").trim();
   const sort = (sp.sort ?? "published_date") as "published_date" | "created_at";
   const order = (sp.order ?? "desc") as "asc" | "desc";
-
   const channel = (sp.channel ?? "all").trim();
   const category = (sp.category ?? "all").trim();
   const level = (sp.level ?? "all").trim();
   const completion = (sp.completion ?? "all") as "all" | "complete" | "incomplete";
 
-  // ---- options ----
-  let optRows: Array<{
-    channel_name: string | null;
-    assigned_category: string | null;
-    assigned_level: string | null;
-  }> = [];
-
-  try {
-    optRows = await fetchAllCategoryOptionRows(supabase);
-  } catch (error) {
-    console.error("Failed to fetch option rows:", error);
-    optRows = [];
-  }
-
-  const channelOptions = uniqSorted(optRows.map((r) => r.channel_name));
-  const categoryOptions = uniqSorted(optRows.map((r) => r.assigned_category));
-  const levelOptions = uniqSorted(optRows.map((r) => r.assigned_level));
-
-  // ---- base query builder ----
   function buildBase(selectClause: string) {
     let qb = supabase.from("categories").select(selectClause);
-
     if (q) qb = qb.or(`video_title.ilike.%${q}%,channel_name.ilike.%${q}%`);
     if (channel !== "all") qb = qb.eq("channel_name", channel);
     if (category !== "all") qb = qb.eq("assigned_category", category);
     if (level !== "all") qb = qb.eq("assigned_level", level);
-
     return qb;
   }
 
-  // ---- completion filter (quiz_attempts per user) ----
   let slugFilter: string[] | null = null;
 
   if (completion !== "all") {
     try {
       const candidates = await fetchAllSlugs(supabase, q, channel, category, level);
-
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user ?? null;
 
       if (!user) {
         slugFilter = completion === "complete" ? [] : candidates;
       } else {
-        const completedSet = await fetchAllCompletedAttemptSlugs(
-          supabase,
-          user.id,
-          candidates
-        );
-
+        const completedSet = await fetchAllCompletedAttemptSlugs(supabase, user.id, candidates);
         slugFilter =
           completion === "complete"
             ? candidates.filter((s) => completedSet.has(s))
@@ -189,30 +150,62 @@ export async function getHomeData(
     }
   }
 
-  // ---- fetch categories ----
-  let rows: CategoryRow[] = [];
-  let fetchError: string | null = null;
-
   if (slugFilter && slugFilter.length === 0) {
-    rows = [];
-  } else {
-    let qb = buildBase(
-      "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
-    );
-
-    if (slugFilter) qb = qb.in("slug", slugFilter);
-
-    const { data, error } = await qb
-      .order(sort, { ascending: order === "asc" })
-      .limit(60);
-
-    if (error) {
-      fetchError = error.message;
-      rows = [];
-    } else {
-      rows = (data as CategoryRow[]) ?? [];
-    }
+    return { rows: [], hasMore: false, fetchError: null };
   }
 
-  return { channelOptions, categoryOptions, levelOptions, rows, fetchError };
+  // Fetch one extra row to determine whether a next page exists.
+  const fetchSize = pageSize + 1;
+  const from = page * pageSize;
+
+  let qb = buildBase(
+    "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
+  );
+
+  if (slugFilter) qb = qb.in("slug", slugFilter);
+
+  const { data, error } = await qb
+    .order(sort, { ascending: order === "asc" })
+    .range(from, from + fetchSize - 1);
+
+  if (error) {
+    return { rows: [], hasMore: false, fetchError: error.message };
+  }
+
+  const allRows = (data as unknown as CategoryRow[]) ?? [];
+  const hasMore = allRows.length > pageSize;
+  const rows = hasMore ? allRows.slice(0, pageSize) : allRows;
+
+  return { rows, hasMore, fetchError: null };
+}
+
+// Used by the home page server component: fetches filter options + first page in parallel.
+export async function getHomeData(
+  supabase: SupabaseClient,
+  sp: HomeSearchParams
+): Promise<HomeData> {
+  const [[channelOptions, categoryOptions, levelOptions], { rows, hasMore, fetchError }] =
+    await Promise.all([
+      Promise.all([
+        fetchDistinctColumn(supabase, "channel_name"),
+        fetchDistinctColumn(supabase, "assigned_category"),
+        fetchDistinctColumn(supabase, "assigned_level"),
+      ]).catch((err) => {
+        console.error("Failed to fetch filter options:", err);
+        return [[], [], []] as [string[], string[], string[]];
+      }),
+      fetchArticleRows(supabase, sp, 0, PAGE_SIZE),
+    ]);
+
+  return { channelOptions, categoryOptions, levelOptions, rows, hasMore, fetchError };
+}
+
+// Used by the /api/articles route for subsequent infinite-scroll pages.
+export async function getArticlePage(
+  supabase: SupabaseClient,
+  sp: HomeSearchParams,
+  page: number,
+  pageSize: number = PAGE_SIZE
+) {
+  return fetchArticleRows(supabase, sp, page, pageSize);
 }

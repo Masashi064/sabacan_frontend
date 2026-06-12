@@ -26,5 +26,6 @@ export type HomeData = {
   categoryOptions: string[];
   levelOptions: string[];
   rows: CategoryRow[];
+  hasMore: boolean;
   fetchError: string | null;
 };

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
 import { ReportIssueButton } from "@/components/article/ReportIssueButton";
+import { formatVideoLength } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -127,7 +128,7 @@ export default async function ArticlePage({
         <p className="text-sm text-muted-foreground">
           {c.channel_name ?? "Unknown channel"}
           {c.published_date ? ` • ${c.published_date}` : ""}
-          {c.video_length ? ` • ${c.video_length}` : ""}
+          {formatVideoLength(c.video_length) ? ` • ${formatVideoLength(c.video_length)}` : ""}
           {c.assigned_level ? ` • ${c.assigned_level}` : ""}
           {c.assigned_category ? ` • ${c.assigned_category}` : ""}
         </p>

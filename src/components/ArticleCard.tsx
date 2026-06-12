@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
+import { formatVideoLength } from "@/lib/utils";
 
 export type ArticleCardData = {
   slug: string;
@@ -50,10 +51,10 @@ export function ArticleCard({
           {article.assignedLevel ? (
             <Badge variant="outline">{article.assignedLevel}</Badge>
           ) : null}
-          {article.videoLength ? (
+          {formatVideoLength(article.videoLength) ? (
             <Badge variant="outline" className="inline-flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              {article.videoLength}
+              {formatVideoLength(article.videoLength)}
             </Badge>
           ) : null}
         </div>

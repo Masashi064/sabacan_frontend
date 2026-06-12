@@ -4,7 +4,6 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -55,10 +54,9 @@ export function ArticleFilters({
   const router = useRouter();
   const sp = useSearchParams();
 
-  console.log("channelOptions:", channelOptions);
-  console.log("channel count:", channelOptions.length);
+  // q is owned by SearchDialog — read it from the URL so filter changes preserve it.
+  const currentQ = sp.get("q") ?? "";
 
-  const [q, setQ] = React.useState(sp.get("q") ?? "");
   const [sort, setSort] = React.useState(sp.get("sort") ?? "published_date");
   const [order, setOrder] = React.useState(sp.get("order") ?? "desc");
 
@@ -72,7 +70,7 @@ export function ArticleFilters({
   const apply = React.useCallback(
     (next?: Partial<Record<string, string>>) => {
       const url = buildUrl({
-        q,
+        q: currentQ,
         sort,
         order,
         channel,
@@ -83,41 +81,11 @@ export function ArticleFilters({
       });
       router.push(url);
     },
-    [router, q, sort, order, channel, category, level, completion]
+    [router, currentQ, sort, order, channel, category, level, completion]
   );
 
   return (
     <div className="rounded-xl border p-4 bg-background space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="search">Search</Label>
-        <Input
-          id="search"
-          value={q}
-          placeholder="Video title or channel..."
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") apply({ q });
-          }}
-        />
-        <div className="grid grid-cols-2 gap-2">
-            <Button type="button" onClick={() => apply({ q })}>
-                Search
-            </Button>
-            <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                setQ("");
-                apply({ q: "" });
-                }}
-            >
-                Clear
-            </Button>
-            </div>
-      </div>
-
-      <Separator />
-
       <div className="space-y-2">
         <Label>Sort</Label>
         <Select
@@ -250,7 +218,6 @@ export function ArticleFilters({
         variant="secondary"
         className="w-full"
         onClick={() => {
-          setQ("");
           setSort("published_date");
           setOrder("desc");
           setChannel("all");

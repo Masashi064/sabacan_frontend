@@ -1,16 +1,20 @@
 // src/app/debug-supabase/page.tsx
+import { redirect } from "next/navigation";
+import { supabaseServer } from "@/lib/supabase/server";
 
-import { supabaseBrowser } from "@/lib/supabase/client";
-
-const TABLE_NAME = "favorite_words"; // ←あなたの元コードに合わせてOK
+const TABLE_NAME = "favorite_words";
 
 export default async function DebugSupabasePage() {
-  const supabase = await supabaseBrowser(); // ✅ await する
+  const supabase = await supabaseServer();
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .select("*")
-    .limit(1);
+  // Require authentication — anonymous access is not allowed here.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login?next=/debug-supabase");
+
+  const { data, error } = await supabase.from(TABLE_NAME).select("*").limit(1);
 
   if (error) {
     return (
