@@ -3,36 +3,22 @@ import type { HomeData, HomeSearchParams, CategoryRow } from "./types";
 
 export const PAGE_SIZE = 24;
 
-// Fetches all distinct non-null values for a single column via paginated queries.
-// Runs in parallel with the other two column fetches, so wall-clock cost is
-// max(ch_time, cat_time, lvl_time) rather than their sum.
-async function fetchDistinctColumn(
-  supabase: SupabaseClient,
-  column: "channel_name" | "assigned_category" | "assigned_level"
-): Promise<string[]> {
-  const pageSize = 1000;
-  const seen = new Set<string>();
-  let from = 0;
+type FilterOptionsRpcResult = {
+  channels: string[] | null;
+  categories: string[] | null;
+  levels: string[] | null;
+};
 
-  while (true) {
-    const { data, error } = await supabase
-      .from("categories")
-      .select(column)
-      .not(column, "is", null)
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-
-    for (const row of (data ?? []) as Record<string, unknown>[]) {
-      const val = row[column];
-      if (typeof val === "string" && val.trim()) seen.add(val.trim());
-    }
-
-    if ((data ?? []).length < pageSize) break;
-    from += pageSize;
-  }
-
-  return Array.from(seen).sort((a, b) => a.localeCompare(b));
+// Fetches distinct filter options in a single DB round-trip via the
+// get_filter_options() PostgreSQL function defined in:
+//   supabase/migrations/20260612_perf_indexes_and_filter_options.sql
+async function fetchFilterOptions(
+  supabase: SupabaseClient
+): Promise<[string[], string[], string[]]> {
+  const { data, error } = await supabase.rpc("get_filter_options");
+  if (error) throw error;
+  const opts = (data ?? {}) as FilterOptionsRpcResult;
+  return [opts.channels ?? [], opts.categories ?? [], opts.levels ?? []];
 }
 
 async function fetchAllSlugs(
@@ -189,11 +175,7 @@ export async function getHomeData(
 ): Promise<HomeData> {
   const [[channelOptions, categoryOptions, levelOptions], { rows, hasMore, totalCount, fetchError }] =
     await Promise.all([
-      Promise.all([
-        fetchDistinctColumn(supabase, "channel_name"),
-        fetchDistinctColumn(supabase, "assigned_category"),
-        fetchDistinctColumn(supabase, "assigned_level"),
-      ]).catch((err) => {
+      fetchFilterOptions(supabase).catch((err) => {
         console.error("Failed to fetch filter options:", err);
         return [[], [], []] as [string[], string[], string[]];
       }),
