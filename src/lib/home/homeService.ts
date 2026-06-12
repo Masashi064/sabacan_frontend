@@ -16,9 +16,55 @@ async function fetchFilterOptions(
   supabase: SupabaseClient
 ): Promise<[string[], string[], string[]]> {
   const { data, error } = await supabase.rpc("get_filter_options");
-  if (error) throw error;
+  if (error) {
+    // PostgrestError is a plain object — wrap in a real Error so it serialises
+    // correctly in Next.js Turbopack server→browser log forwarding ({} problem).
+    throw new Error(
+      [
+        "get_filter_options RPC failed.",
+        `message : ${error.message ?? "–"}`,
+        `code    : ${error.code ?? "–"}`,
+        `details : ${error.details ?? "–"}`,
+        `hint    : ${error.hint ?? "–"}`,
+      ].join("\n")
+    );
+  }
   const opts = (data ?? {}) as FilterOptionsRpcResult;
   return [opts.channels ?? [], opts.categories ?? [], opts.levels ?? []];
+}
+
+// Fallback used when get_filter_options() RPC does not exist yet
+// (SQL migration not yet applied). Paginates one column at a time.
+async function fetchDistinctColumnFallback(
+  supabase: SupabaseClient,
+  column: "channel_name" | "assigned_category" | "assigned_level"
+): Promise<string[]> {
+  const pageSize = 1000;
+  const seen = new Set<string>();
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("categories")
+      .select(column)
+      .not(column, "is", null)
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error(`[fetchDistinctColumnFallback] ${column}: ${error.message}`);
+      break;
+    }
+
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const val = row[column];
+      if (typeof val === "string" && val.trim()) seen.add(val.trim());
+    }
+
+    if ((data ?? []).length < pageSize) break;
+    from += pageSize;
+  }
+
+  return Array.from(seen).sort((a, b) => a.localeCompare(b));
 }
 
 async function fetchAllSlugs(
@@ -175,9 +221,23 @@ export async function getHomeData(
 ): Promise<HomeData> {
   const [[channelOptions, categoryOptions, levelOptions], { rows, hasMore, totalCount, fetchError }] =
     await Promise.all([
-      fetchFilterOptions(supabase).catch((err) => {
-        console.error("Failed to fetch filter options:", err);
-        return [[], [], []] as [string[], string[], string[]];
+      fetchFilterOptions(supabase).catch(async (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[homeService] fetchFilterOptions failed:\n" + msg);
+        console.warn(
+          "[homeService] RPC not available — falling back to column queries.\n" +
+          "  Fix: run supabase/migrations/20260612_perf_indexes_and_filter_options.sql"
+        );
+        // Fallback: paginate each column independently (slower, no DB function needed)
+        try {
+          return await Promise.all([
+            fetchDistinctColumnFallback(supabase, "channel_name"),
+            fetchDistinctColumnFallback(supabase, "assigned_category"),
+            fetchDistinctColumnFallback(supabase, "assigned_level"),
+          ]) as [string[], string[], string[]];
+        } catch {
+          return [[], [], []] as [string[], string[], string[]];
+        }
       }),
       fetchArticleRows(supabase, sp, 0, PAGE_SIZE),
     ]);

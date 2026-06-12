@@ -34,42 +34,40 @@ CREATE INDEX IF NOT EXISTS idx_categories_created_at
 --    single round-trip instead of paginating all 8000+ rows
 --    in JavaScript.
 --
---    STABLE   : result may be cached within a single query.
---    SECURITY DEFINER + SET search_path : safe from search-
---      path injection; runs as the function owner so it can
---      read categories regardless of caller's RLS context.
+--    STABLE  : result may be cached within a single query.
+--    jsonb   : binary JSON — slightly faster than json for
+--              repeated reads; PostgREST/Supabase JS parses
+--              both identically on the client side.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.get_filter_options()
-RETURNS json
+RETURNS jsonb
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
-SET search_path = public
 AS $$
   WITH
     ch AS (
       SELECT DISTINCT channel_name AS val
-      FROM   public.categories
-      WHERE  channel_name IS NOT NULL
-        AND  trim(channel_name) <> ''
+      FROM public.categories
+      WHERE channel_name IS NOT NULL
+        AND btrim(channel_name) <> ''
     ),
     ca AS (
       SELECT DISTINCT assigned_category AS val
-      FROM   public.categories
-      WHERE  assigned_category IS NOT NULL
-        AND  trim(assigned_category) <> ''
+      FROM public.categories
+      WHERE assigned_category IS NOT NULL
+        AND btrim(assigned_category) <> ''
     ),
     lv AS (
       SELECT DISTINCT assigned_level AS val
-      FROM   public.categories
-      WHERE  assigned_level IS NOT NULL
-        AND  trim(assigned_level) <> ''
+      FROM public.categories
+      WHERE assigned_level IS NOT NULL
+        AND btrim(assigned_level) <> ''
     )
-  SELECT json_build_object(
-    'channels',   COALESCE((SELECT json_agg(val ORDER BY val) FROM ch), '[]'::json),
-    'categories', COALESCE((SELECT json_agg(val ORDER BY val) FROM ca), '[]'::json),
-    'levels',     COALESCE((SELECT json_agg(val ORDER BY val) FROM lv), '[]'::json)
+  SELECT jsonb_build_object(
+    'channels',   COALESCE((SELECT jsonb_agg(val ORDER BY val) FROM ch), '[]'::jsonb),
+    'categories', COALESCE((SELECT jsonb_agg(val ORDER BY val) FROM ca), '[]'::jsonb),
+    'levels',     COALESCE((SELECT jsonb_agg(val ORDER BY val) FROM lv), '[]'::jsonb)
   );
 $$;
 
