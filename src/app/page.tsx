@@ -5,6 +5,7 @@ import { ArticleFilters } from "@/components/ArticleFilters";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { MobileFiltersSheet } from "@/components/home/MobileFiltersSheet";
 import { ArticleGrid } from "@/components/home/ArticleGrid";
+import { FilterStatus } from "@/components/home/FilterStatus";
 
 import { getHomeData } from "@/lib/home/homeService";
 import type { HomeSearchParams } from "@/lib/home/types";
@@ -20,7 +21,7 @@ export default async function Home({
 
   const supabase = await supabaseServer();
 
-  const { channelOptions, categoryOptions, levelOptions, rows, hasMore, fetchError } =
+  const { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError } =
     await getHomeData(supabase, sp);
 
   const articles: ArticleCardData[] = rows.map((row) => ({
@@ -64,6 +65,8 @@ export default async function Home({
               <p className="mt-2 text-sm text-muted-foreground">{fetchError}</p>
             </section>
           ) : null}
+
+          <FilterStatus totalCount={totalCount} searchParams={sp} />
 
           {/* key causes remount (state reset) whenever filter params change */}
           <ArticleGrid

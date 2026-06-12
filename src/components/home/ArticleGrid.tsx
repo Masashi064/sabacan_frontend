@@ -78,7 +78,7 @@ export function ArticleGrid({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-0 duration-200">
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((a) => (
           <ArticleCard key={a.slug} article={a} href={`/articles/${a.slug}`} />

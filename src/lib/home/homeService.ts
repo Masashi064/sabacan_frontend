@@ -109,7 +109,7 @@ async function fetchArticleRows(
   sp: HomeSearchParams,
   page: number,
   pageSize: number
-): Promise<{ rows: CategoryRow[]; hasMore: boolean; fetchError: string | null }> {
+): Promise<{ rows: CategoryRow[]; hasMore: boolean; totalCount: number; fetchError: string | null }> {
   const q = (sp.q ?? "").trim();
   const sort = (sp.sort ?? "published_date") as "published_date" | "created_at";
   const order = (sp.order ?? "desc") as "asc" | "desc";
@@ -118,8 +118,10 @@ async function fetchArticleRows(
   const level = (sp.level ?? "all").trim();
   const completion = (sp.completion ?? "all") as "all" | "complete" | "incomplete";
 
+  // { count: "exact" } tells PostgREST to return the total row count in Content-Range.
+  // The count reflects all matching rows regardless of the .range() window.
   function buildBase(selectClause: string) {
-    let qb = supabase.from("categories").select(selectClause);
+    let qb = supabase.from("categories").select(selectClause, { count: "exact" });
     if (q) qb = qb.or(`video_title.ilike.%${q}%,channel_name.ilike.%${q}%`);
     if (channel !== "all") qb = qb.eq("channel_name", channel);
     if (category !== "all") qb = qb.eq("assigned_category", category);
@@ -151,7 +153,7 @@ async function fetchArticleRows(
   }
 
   if (slugFilter && slugFilter.length === 0) {
-    return { rows: [], hasMore: false, fetchError: null };
+    return { rows: [], hasMore: false, totalCount: 0, fetchError: null };
   }
 
   // Fetch one extra row to determine whether a next page exists.
@@ -164,19 +166,20 @@ async function fetchArticleRows(
 
   if (slugFilter) qb = qb.in("slug", slugFilter);
 
-  const { data, error } = await qb
+  const { data, count, error } = await qb
     .order(sort, { ascending: order === "asc" })
     .range(from, from + fetchSize - 1);
 
   if (error) {
-    return { rows: [], hasMore: false, fetchError: error.message };
+    return { rows: [], hasMore: false, totalCount: 0, fetchError: error.message };
   }
 
   const allRows = (data as unknown as CategoryRow[]) ?? [];
   const hasMore = allRows.length > pageSize;
   const rows = hasMore ? allRows.slice(0, pageSize) : allRows;
+  const totalCount = count ?? 0;
 
-  return { rows, hasMore, fetchError: null };
+  return { rows, hasMore, totalCount, fetchError: null };
 }
 
 // Used by the home page server component: fetches filter options + first page in parallel.
@@ -184,7 +187,7 @@ export async function getHomeData(
   supabase: SupabaseClient,
   sp: HomeSearchParams
 ): Promise<HomeData> {
-  const [[channelOptions, categoryOptions, levelOptions], { rows, hasMore, fetchError }] =
+  const [[channelOptions, categoryOptions, levelOptions], { rows, hasMore, totalCount, fetchError }] =
     await Promise.all([
       Promise.all([
         fetchDistinctColumn(supabase, "channel_name"),
@@ -197,7 +200,7 @@ export async function getHomeData(
       fetchArticleRows(supabase, sp, 0, PAGE_SIZE),
     ]);
 
-  return { channelOptions, categoryOptions, levelOptions, rows, hasMore, fetchError };
+  return { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError };
 }
 
 // Used by the /api/articles route for subsequent infinite-scroll pages.

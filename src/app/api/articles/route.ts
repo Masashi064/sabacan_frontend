@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   };
 
   const supabase = await supabaseServer();
-  const { rows, hasMore, fetchError } = await getArticlePage(supabase, sp, page);
+  const { rows, hasMore, totalCount, fetchError } = await getArticlePage(supabase, sp, page);
 
   if (fetchError) {
     return NextResponse.json({ error: fetchError }, { status: 500 });
@@ -36,5 +36,5 @@ export async function GET(req: Request) {
     videoLength: row.video_length,
   }));
 
-  return NextResponse.json({ rows: articles, hasMore });
+  return NextResponse.json({ rows: articles, hasMore, totalCount });
 }
