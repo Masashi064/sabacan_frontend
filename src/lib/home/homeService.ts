@@ -67,69 +67,30 @@ async function fetchDistinctColumnFallback(
   return Array.from(seen).sort((a, b) => a.localeCompare(b));
 }
 
-async function fetchAllSlugs(
-  supabase: SupabaseClient,
-  q: string,
-  channel: string,
-  category: string,
-  level: string
-) {
+// Slugs the user has completed at least once. Not scoped to the current
+// q/channel/category/level filters — the result is combined with those
+// filters directly in the main `categories` query via .in()/.not("in").
+async function fetchCompletedAttemptSlugs(supabase: SupabaseClient, userId: string) {
   const pageSize = 1000;
   let from = 0;
-  let allRows: Array<{ slug: string }> = [];
-
-  while (true) {
-    let qb = supabase.from("categories").select("slug");
-
-    if (q) qb = qb.or(`video_title.ilike.%${q}%,channel_name.ilike.%${q}%`);
-    if (channel !== "all") qb = qb.eq("channel_name", channel);
-    if (category !== "all") qb = qb.eq("assigned_category", category);
-    if (level !== "all") qb = qb.eq("assigned_level", level);
-
-    const { data, error } = await qb.range(from, from + pageSize - 1);
-
-    if (error) throw error;
-
-    const rows = ((data ?? []) as unknown[])
-      .filter((r): r is { slug: string } => typeof (r as any)?.slug === "string")
-      .map((r) => ({ slug: r.slug }));
-
-    allRows = allRows.concat(rows);
-
-    if (rows.length < pageSize) break;
-    from += pageSize;
-  }
-
-  return allRows.map((r) => r.slug);
-}
-
-async function fetchAllCompletedAttemptSlugs(
-  supabase: SupabaseClient,
-  userId: string,
-  candidates: string[]
-) {
-  if (candidates.length === 0) return new Set<string>();
-
-  const chunkSize = 500;
   const completed = new Set<string>();
 
-  for (let i = 0; i < candidates.length; i += chunkSize) {
-    const chunk = candidates.slice(i, i + chunkSize);
-
+  while (true) {
     const { data, error } = await supabase
       .from("quiz_attempts")
       .select("slug")
       .eq("user_id", userId)
-      .in("slug", chunk)
-      .not("completed_at", "is", null);
+      .not("completed_at", "is", null)
+      .range(from, from + pageSize - 1);
 
     if (error) throw error;
 
     for (const row of data ?? []) {
-      if (typeof row?.slug === "string" && row.slug) {
-        completed.add(row.slug);
-      }
+      if (typeof row?.slug === "string" && row.slug) completed.add(row.slug);
     }
+
+    if ((data ?? []).length < pageSize) break;
+    from += pageSize;
   }
 
   return completed;
@@ -161,30 +122,28 @@ async function fetchArticleRows(
     return qb;
   }
 
-  let slugFilter: string[] | null = null;
+  // Completed slugs are always a small subset of the catalog, so we filter
+  // by including/excluding that small set rather than enumerating every
+  // candidate slug (a giant .in() list times out / exceeds URL limits).
+  let completedSlugs: string[] | null = null;
 
   if (completion !== "all") {
     try {
-      const candidates = await fetchAllSlugs(supabase, q, channel, category, level);
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user ?? null;
 
-      if (!user) {
-        slugFilter = completion === "complete" ? [] : candidates;
+      if (user) {
+        completedSlugs = Array.from(await fetchCompletedAttemptSlugs(supabase, user.id));
       } else {
-        const completedSet = await fetchAllCompletedAttemptSlugs(supabase, user.id, candidates);
-        slugFilter =
-          completion === "complete"
-            ? candidates.filter((s) => completedSet.has(s))
-            : candidates.filter((s) => !completedSet.has(s));
+        completedSlugs = [];
       }
     } catch (error) {
       console.error("Failed to build completion filter:", error);
-      slugFilter = null;
+      completedSlugs = null;
     }
   }
 
-  if (slugFilter && slugFilter.length === 0) {
+  if (completion === "complete" && completedSlugs && completedSlugs.length === 0) {
     return { rows: [], hasMore: false, totalCount: 0, fetchError: null };
   }
 
@@ -196,7 +155,10 @@ async function fetchArticleRows(
     "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
   );
 
-  if (slugFilter) qb = qb.in("slug", slugFilter);
+  if (completedSlugs && completedSlugs.length > 0) {
+    const list = `(${completedSlugs.map((s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")})`;
+    qb = completion === "complete" ? qb.in("slug", completedSlugs) : qb.not("slug", "in", list);
+  }
 
   const { data, count, error } = await qb
     .order(sort, { ascending: order === "asc" })
