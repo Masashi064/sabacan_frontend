@@ -129,7 +129,11 @@ export default async function ArticlePage({
     );
   }
 
-  const leadIntro: string | null = q?.quiz_json?.lead_intro ?? null;
+  // Note: lead_intro (formerly shown here as "Summary") is intentionally
+  // not rendered on this page anymore — after watching the video and
+  // taking the quiz, a pre-video synopsis adds little value. The data
+  // is kept for use as "description text" elsewhere (recommendation
+  // cards, article list, search results), just not surfaced here.
 
   const quizList: QuizQuestion[] = Array.isArray(q?.quiz_json?.quiz)
     ? q!.quiz_json.quiz
@@ -201,13 +205,6 @@ export default async function ArticlePage({
               Quiz data is not available yet for this article.
             </p>
           )}
-        </LearningSection>
-
-        {/* Summary (article meta + the former "Lead" text) */}
-        <LearningSection icon="📖" title="Summary" description="A short recap of the video.">
-          <p className="text-sm leading-relaxed">
-            {leadIntro ?? "Lead intro is not available yet."}
-          </p>
         </LearningSection>
 
         {/* Vocabulary */}

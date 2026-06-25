@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { gaEvent } from "@/lib/ga";
@@ -298,11 +297,11 @@ export function QuizSection({
           const isLast = idx === quiz.length - 1;
 
           return (
-            <Card key={idx} className="overflow-hidden">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-base">
+            <div key={idx} className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-base font-medium">
                   Q{idx + 1}. {q.question}
-                </CardTitle>
+                </p>
 
                 {!isAnswered ? (
                   <p className="text-sm text-muted-foreground">Choose an answer.</p>
@@ -311,123 +310,105 @@ export function QuizSection({
                 ) : (
                   <p className="text-sm font-medium text-red-700">Incorrect ❌</p>
                 )}
-              </CardHeader>
+              </div>
 
-              <CardContent className="space-y-3">
-                <div className="grid gap-2">
-                  {q.choices.map((choice) => {
-                    const chosen = picked === choice;
-                    const correct = q.answer === choice;
+              <div className="grid gap-2">
+                {q.choices.map((choice) => {
+                  const chosen = picked === choice;
+                  const correct = q.answer === choice;
 
-                    const base =
-                      "w-full text-left rounded-md border px-3 py-2 text-sm transition-colors";
-                    const state = !isAnswered
-                      ? "hover:bg-muted"
-                      : chosen && correct
-                      ? "border-emerald-500 bg-emerald-50"
-                      : chosen && !correct
-                      ? "border-red-500 bg-red-50"
-                      : correct
-                      ? "border-emerald-300 bg-emerald-50/50"
-                      : "opacity-70";
+                  const base =
+                    "w-full text-left rounded-md border px-3 py-2 text-sm transition-colors";
+                  const state = !isAnswered
+                    ? "hover:bg-muted"
+                    : chosen && correct
+                    ? "border-emerald-500 bg-emerald-50"
+                    : chosen && !correct
+                    ? "border-red-500 bg-red-50"
+                    : correct
+                    ? "border-emerald-300 bg-emerald-50/50"
+                    : "opacity-70";
 
-                    return (
-                      <button
-                        key={choice}
-                        type="button"
-                        className={cn(base, state)}
-                        onClick={() => handleChoice(idx, choice)}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <span>{choice}</span>
-                          {isAnswered && correct ? (
-                            <span className="text-emerald-700 font-medium">
-                              Answer
-                            </span>
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })}
+                  return (
+                    <button
+                      key={choice}
+                      type="button"
+                      className={cn(base, state)}
+                      onClick={() => handleChoice(idx, choice)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span>{choice}</span>
+                        {isAnswered && correct ? (
+                          <span className="text-emerald-700 font-medium">Answer</span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {isAnswered ? (
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                  <p className="text-sm">
+                    <span className="font-medium">Correct answer:</span> {q.answer}
+                  </p>
+                  {q.explanation ? (
+                    <p className="text-sm text-muted-foreground">{q.explanation}</p>
+                  ) : null}
                 </div>
+              ) : null}
 
-                {isAnswered ? (
-                  <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                    <p className="text-sm">
-                      <span className="font-medium">Correct answer:</span> {q.answer}
-                    </p>
-                    {q.explanation ? (
-                      <p className="text-sm text-muted-foreground">{q.explanation}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <Button
-                    variant="outline"
-                    onClick={() => goTo(idx - 1)}
-                    disabled={idx === 0}
-                  >
-                    Back
-                  </Button>
-                  <Button onClick={() => goTo(idx + 1)}>
-                    {isLast ? "See results" : "Next"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <Button variant="outline" onClick={() => goTo(idx - 1)} disabled={idx === 0}>
+                  Back
+                </Button>
+                <Button onClick={() => goTo(idx + 1)}>{isLast ? "See results" : "Next"}</Button>
+              </div>
+            </div>
           );
         })()
       ) : answeredCount < quiz.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Quiz not finished</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Answer all {quiz.length} questions to see your results and earn coins.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const idx = firstUnansweredIndex();
-                if (idx !== null) goTo(idx);
-              }}
-            >
-              Go to unanswered question
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          <p className="text-base font-medium">Quiz not finished</p>
+          <p className="text-sm text-muted-foreground">
+            Answer all {quiz.length} questions to see your results and earn coins.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const idx = firstUnansweredIndex();
+              if (idx !== null) goTo(idx);
+            }}
+          >
+            Go to unanswered question
+          </Button>
+        </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              {correctCount} / {quiz.length} Correct!
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {coinAwardStatus === "skipped" ? (
-              <p className="text-sm text-muted-foreground">
-                Login to earn coins for completing quizzes.
+        <div className="space-y-2">
+          <p className="text-base font-medium">
+            {correctCount} / {quiz.length} Correct!
+          </p>
+          {coinAwardStatus === "skipped" ? (
+            <p className="text-sm text-muted-foreground">
+              Login to earn coins for completing quizzes.
+            </p>
+          ) : coinAwardStatus === "error" ? (
+            <p className="text-sm text-muted-foreground">Coins could not be saved.</p>
+          ) : coinAwardStatus === "awarded" && coinResult ? (
+            <>
+              <p className="text-base font-semibold text-emerald-700">
+                +{coinResult.awarded} Coins
               </p>
-            ) : coinAwardStatus === "error" ? (
-              <p className="text-sm text-muted-foreground">Coins could not be saved.</p>
-            ) : coinAwardStatus === "awarded" && coinResult ? (
-              <>
-                <p className="text-base font-semibold text-emerald-700">
-                  +{coinResult.awarded} Coins
+              {coinResult.isFirst && coinResult.bonus > 0 ? (
+                <p className="text-sm font-medium text-amber-600">
+                  Perfect! +{coinResult.bonus} Bonus!
                 </p>
-                {coinResult.isFirst && coinResult.bonus > 0 ? (
-                  <p className="text-sm font-medium text-amber-600">
-                    Perfect! +{coinResult.bonus} Bonus!
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Awarding coins…</p>
-            )}
-          </CardContent>
-        </Card>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Awarding coins…</p>
+          )}
+        </div>
       )}
     </section>
   );
