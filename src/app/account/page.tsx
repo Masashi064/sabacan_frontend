@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TrendChart } from "@/components/analytics/TrendChart";
 import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
+import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 
 type PerformanceOverviewRow = {
   user_id: string;
@@ -68,6 +69,11 @@ type FavoriteWordRow = {
   slug: string | null;
   video_id: string | null;
   created_at: string;
+};
+
+type ContentPreferencesRow = {
+  categories: string[];
+  channels: string[];
 };
 
 type Section<T> = {
@@ -129,6 +135,26 @@ export default function AccountPage() {
   const [recentFav, setRecentFav] = React.useState<Section<FavoriteWordRow[]>>(
     initialSection([])
   );
+  const [contentPrefs, setContentPrefs] = React.useState<Section<ContentPreferencesRow>>(
+    initialSection({ categories: [], channels: [] })
+  );
+  const [editPrefsOpen, setEditPrefsOpen] = React.useState(false);
+
+  async function loadContentPrefs(uid: string) {
+    const [catRes, chRes] = await Promise.all([
+      supabase.from("favorite_categories").select("category_name").eq("user_id", uid),
+      supabase.from("favorite_channels").select("channel_name").eq("user_id", uid),
+    ]);
+
+    setContentPrefs({
+      data: {
+        categories: (catRes.data ?? []).map((r: any) => r.category_name),
+        channels: (chRes.data ?? []).map((r: any) => r.channel_name),
+      },
+      loading: false,
+      error: catRes.error?.message ?? chRes.error?.message ?? null,
+    });
+  }
 
   async function loadAll() {
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
@@ -149,8 +175,11 @@ export default function AccountPage() {
     setScoresDaily(initialSection([]));
     setCalendar90(initialSection([]));
     setRecentFav(initialSection([]));
+    setContentPrefs(initialSection({ categories: [], channels: [] }));
 
     const uid = currentUser.id;
+
+    void loadContentPrefs(uid);
 
     supabase
       .from("v_account_performance_overview")
@@ -229,7 +258,8 @@ export default function AccountPage() {
     attemptsCum.loading ||
     scoresDaily.loading ||
     calendar90.loading ||
-    recentFav.loading;
+    recentFav.loading ||
+    contentPrefs.loading;
 
   const sectionErrors = [
     perf.error,
@@ -239,6 +269,7 @@ export default function AccountPage() {
     scoresDaily.error,
     calendar90.error,
     recentFav.error,
+    contentPrefs.error,
   ].filter((e): e is string => Boolean(e));
 
   async function onSignOut() {
@@ -313,6 +344,44 @@ export default function AccountPage() {
           <Button variant="outline" onClick={onSignOut} disabled={!authChecked || signingOut}>
             <LogOut className="mr-2 h-4 w-4" />
             {signingOut ? "Signing out…" : "Sign out"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Content Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Content Preferences</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          {contentPrefs.loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          ) : (
+            <div className="space-y-1 text-sm">
+              <p>
+                <span className="font-medium">Favorite Categories: </span>
+                <span className="text-muted-foreground">
+                  {contentPrefs.data.categories.length > 0
+                    ? contentPrefs.data.categories.join(", ")
+                    : "None yet"}
+                </span>
+              </p>
+              <p>
+                <span className="font-medium">Favorite Channels: </span>
+                <span className="text-muted-foreground">
+                  {contentPrefs.data.channels.length > 0
+                    ? contentPrefs.data.channels.join(", ")
+                    : "None yet"}
+                </span>
+              </p>
+            </div>
+          )}
+
+          <Button variant="outline" onClick={() => setEditPrefsOpen(true)}>
+            Edit Preferences
           </Button>
         </CardContent>
       </Card>
@@ -552,6 +621,15 @@ export default function AccountPage() {
         Learning time is currently based on quiz duration only. We can expand it later (sessions,
         reading time, vocab review, etc.).
       </div>
+
+      <PreferencesDialog
+        open={editPrefsOpen}
+        onOpenChange={setEditPrefsOpen}
+        mode="edit"
+        onSaved={() => {
+          if (user) void loadContentPrefs(user.id);
+        }}
+      />
     </main>
   );
 }

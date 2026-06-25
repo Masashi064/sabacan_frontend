@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
 import { CoinProvider } from "@/lib/coins/CoinProvider";
 import { CoinToastLayer } from "@/components/CoinToastLayer";
+import { OnboardingGate } from "@/components/preferences/OnboardingGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,6 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <CoinToastLayer />
         </CoinProvider>
+
+        <OnboardingGate />
 
         {/* ✅ SPA遷移のPV計測 */}
         <GaPageView />
