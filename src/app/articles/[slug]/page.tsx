@@ -4,7 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
 import { ReportIssueButton } from "@/components/article/ReportIssueButton";
+import { LearningSection } from "@/components/article/LearningSection";
 import { formatVideoLength } from "@/lib/utils";
+import {
+  parseTranscriptJsonToParagraphs,
+  parseVttToParagraphs,
+} from "@/lib/transcript/parseVtt";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +38,13 @@ type VocabRow = {
   vocab_json: any | null;
 };
 
+type CaptionsRow = {
+  video_id: string | null;
+  slug: string;
+  vtt_text: string | null;
+  transcript_json: unknown;
+};
+
 export default async function ArticlePage({
   params,
 }: {
@@ -48,6 +60,7 @@ export default async function ArticlePage({
     { data: category, error: catErr },
     { data: quizRow, error: quizErr },
     { data: vocabRow, error: vocabErr },
+    captionsRes,
   ] = await Promise.all([
     supabase.from("categories").select("*").eq("slug", slug).maybeSingle(),
     supabase.from("quiz").select("*").eq("slug", slug).maybeSingle(),
@@ -58,6 +71,17 @@ export default async function ArticlePage({
       .order("id", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Transcript is a nice-to-have enhancement — never let a missing
+    // table/row break the rest of the page.
+    supabase
+      .from("captions")
+      .select("video_id,slug,vtt_text,transcript_json")
+      .eq("slug", slug)
+      .maybeSingle()
+      .then(
+        (res) => res,
+        () => ({ data: null, error: null })
+      ),
   ]);
 
   if (catErr || quizErr || vocabErr) {
@@ -83,6 +107,7 @@ export default async function ArticlePage({
   const c = category as CategoryRow | null;
   const q = quizRow as QuizRow | null;
   const v = vocabRow as VocabRow | null;
+  const captions = (captionsRes?.data ?? null) as CaptionsRow | null;
 
   if (!c) {
     return (
@@ -114,8 +139,25 @@ export default async function ArticlePage({
     ? v!.vocab_json.vocabulary
     : [];
 
+  // Prefer vtt_text (raw WebVTT) when present; fall back to
+  // transcript_json's best-effort shape only when there's no vtt_text.
+  const transcriptParagraphs: string[] = captions?.vtt_text
+    ? parseVttToParagraphs(captions.vtt_text)
+    : captions?.transcript_json
+    ? parseTranscriptJsonToParagraphs(captions.transcript_json)
+    : [];
+
+  const metaLine = [
+    c.channel_name ?? "Unknown channel",
+    formatVideoLength(c.video_length),
+    c.assigned_level,
+    c.assigned_category,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
   return (
-    <main className="mx-auto max-w-4xl p-6 space-y-8">
+    <main className="mx-auto max-w-4xl p-6 space-y-6">
       {/* ✅ ここで「記事ページに入った瞬間に計測開始」 */}
       <StudyStartMarker slug={slug} />
 
@@ -123,86 +165,110 @@ export default async function ArticlePage({
         ← Back
       </a>
 
-      <header>
+      <header className="space-y-1">
         <h1 className="text-2xl font-semibold">{c.video_title ?? c.slug}</h1>
+        {metaLine ? <p className="text-xs text-muted-foreground">{metaLine}</p> : null}
       </header>
 
       {/* YouTube */}
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Video</h2>
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
+        {c.video_id ? (
+          <iframe
+            className="h-full w-full"
+            src={`https://www.youtube.com/embed/${c.video_id}`}
+            title={c.video_title ?? "YouTube video"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+            video_id is missing
+          </div>
+        )}
+      </div>
 
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
-          {c.video_id ? (
-            <iframe
-              className="h-full w-full"
-              src={`https://www.youtube.com/embed/${c.video_id}`}
-              title={c.video_title ?? "YouTube video"}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+      <div className="space-y-4">
+        {/* Quiz */}
+        <LearningSection
+          icon="🧠"
+          title="Quiz"
+          description="Answer 5 questions about the video."
+        >
+          {quizList.length > 0 ? (
+            <QuizSection quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
           ) : (
-            <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
-              video_id is missing
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Quiz */}
-      <section>
-        {quizList.length > 0 ? (
-          <QuizSection quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Quiz</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Quiz data is not available yet for this article.
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {/* Summary (article meta + the former "Lead" text) */}
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Summary</h2>
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <p className="text-xs text-muted-foreground">
-              {c.channel_name ?? "Unknown channel"}
-              {c.published_date ? ` • ${c.published_date}` : ""}
-              {formatVideoLength(c.video_length) ? ` • ${formatVideoLength(c.video_length)}` : ""}
-              {c.assigned_level ? ` • ${c.assigned_level}` : ""}
-              {c.assigned_category ? ` • ${c.assigned_category}` : ""}
             </p>
-            <p className="text-sm leading-relaxed">
-              {leadIntro ?? "Lead intro is not available yet."}
-            </p>
-          </CardContent>
-        </Card>
-      </section>
+          )}
+        </LearningSection>
 
-      {/* Vocabulary */}
-      <section>
-        {vocabItems.length > 0 ? (
-          <VocabularySection items={vocabItems} slug={slug} videoId={c.video_id ?? null} />
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Vocabulary</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+        {/* Summary (article meta + the former "Lead" text) */}
+        <LearningSection icon="📖" title="Summary" description="A short recap of the video.">
+          <p className="text-sm leading-relaxed">
+            {leadIntro ?? "Lead intro is not available yet."}
+          </p>
+        </LearningSection>
+
+        {/* Vocabulary */}
+        <LearningSection
+          icon="🧩"
+          title="Vocabulary"
+          meta={
+            vocabItems.length > 0
+              ? `${vocabItems.length} word${vocabItems.length === 1 ? "" : "s"} to learn`
+              : undefined
+          }
+          description="Tap to flip cards and save favorites."
+          collapsible
+          showLabel="Show vocabulary"
+          hideLabel="Hide vocabulary"
+        >
+          {vocabItems.length > 0 ? (
+            <VocabularySection items={vocabItems} slug={slug} videoId={c.video_id ?? null} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
               Vocabulary data is not available yet for this article.
-            </CardContent>
-          </Card>
-        )}
-      </section>
+            </p>
+          )}
+        </LearningSection>
 
-      <section>
-        <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
-      </section>
+        {/* Transcript */}
+        <LearningSection
+          icon="💬"
+          title="Transcript"
+          description="Read along with the video."
+          collapsible
+          showLabel="Show transcript"
+          hideLabel="Hide transcript"
+        >
+          {transcriptParagraphs.length > 0 ? (
+            <div className="space-y-3">
+              {transcriptParagraphs.map((p, i) => (
+                <p key={i} className="text-sm leading-relaxed text-muted-foreground">
+                  {p}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Transcript is not available yet for this article.
+            </p>
+          )}
+        </LearningSection>
 
+        {/* Found a problem? */}
+        <LearningSection
+          icon="⚠️"
+          title="Found a problem?"
+          description="Help us improve this article."
+          collapsible
+          showLabel="Report an issue"
+          hideLabel="Close"
+        >
+          <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
+        </LearningSection>
+      </div>
     </main>
   );
 }

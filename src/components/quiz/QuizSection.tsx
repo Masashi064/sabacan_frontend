@@ -261,7 +261,6 @@ export function QuizSection({
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold">Quiz</h2>
           {!showResults ? (
             <p className="text-sm text-muted-foreground">
               Question {Math.min(currentIndex + 1, quiz.length)} of {quiz.length}

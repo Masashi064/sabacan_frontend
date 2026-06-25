@@ -4,7 +4,7 @@ import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Volume2, Heart, ChevronDown, ChevronUp } from "lucide-react";
+import { Volume2, Heart } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 export type VocabItem = {
@@ -164,8 +164,6 @@ export function VocabularySection({
   const [localFav, setLocalFav] = React.useState<Set<string>>(new Set());
   const [busyWord, setBusyWord] = React.useState<string | null>(null);
   const [note, setNote] = React.useState<string | null>(null);
-  // Collapsed by default so the quiz below isn't crowded out.
-  const [collapsed, setCollapsed] = React.useState(true);
 
   // 初回に「このページに出ている単語の中で、お気に入り済み」を取得
   React.useEffect(() => {
@@ -280,55 +278,21 @@ export function VocabularySection({
   };
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold">Vocabulary</h2>
-          <p className="text-sm text-muted-foreground">
-            Tap a card to flip. Use the heart to save favorites.
-          </p>
-        </div>
+    <div className="space-y-3">
+      {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
 
-        <div className="flex items-center gap-3">
-          {note ? (
-            <div className="text-xs text-muted-foreground text-right max-w-[320px]">
-              {note}
-            </div>
-          ) : null}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setCollapsed((v) => !v)}
-          >
-            {collapsed ? (
-              <>
-                Show <ChevronDown className="ml-1 h-4 w-4" />
-              </>
-            ) : (
-              <>
-                Hide <ChevronUp className="ml-1 h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </div>
+      {/* lg以上は2列（カード横幅に余裕）、モバイルは1列 */}
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        {items.map((it) => (
+          <VocabFlipCard
+            key={it.word}
+            item={it}
+            isFavorite={localFav.has(it.word)}
+            onToggleFavorite={toggleFavorite}
+            busy={busyWord === it.word}
+          />
+        ))}
       </div>
-
-      {!collapsed ? (
-        // lg以上は2列（カード横幅に余裕）、モバイルは1列
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-          {items.map((it) => (
-            <VocabFlipCard
-              key={it.word}
-              item={it}
-              isFavorite={localFav.has(it.word)}
-              onToggleFavorite={toggleFavorite}
-              busy={busyWord === it.word}
-            />
-          ))}
-        </div>
-      ) : null}
-    </section>
+    </div>
   );
 }
