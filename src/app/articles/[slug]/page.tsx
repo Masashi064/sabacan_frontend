@@ -7,6 +7,7 @@ import type { QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
 import { ReportIssueButton } from "@/components/article/ReportIssueButton";
 import { LearningSection } from "@/components/article/LearningSection";
+import { CopyButton } from "@/components/article/CopyButton";
 import { formatVideoLength } from "@/lib/utils";
 import {
   parseTranscriptJsonToParagraphs,
@@ -235,6 +236,11 @@ export default async function ArticlePage({
           collapsible
           showLabel="Show transcript"
           hideLabel="Hide transcript"
+          titleRight={
+            transcriptParagraphs.length > 0 ? (
+              <CopyButton text={transcriptParagraphs.join("\n\n")} />
+            ) : undefined
+          }
         >
           {transcriptParagraphs.length > 0 ? (
             <div className="space-y-3">
