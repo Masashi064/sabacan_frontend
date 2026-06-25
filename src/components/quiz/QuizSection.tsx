@@ -99,19 +99,7 @@ export function QuizSection({
   const coinAwardSubmittedRef = React.useRef(false);
   const bonusToastSentRef = React.useRef(false);
   const quizCompleteSentRef = React.useRef(false);
-  const autoAdvanceTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  React.useEffect(() => {
-    return () => {
-      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
-    };
-  }, []);
-
   function goTo(idx: number) {
-    if (autoAdvanceTimeoutRef.current) {
-      clearTimeout(autoAdvanceTimeoutRef.current);
-      autoAdvanceTimeoutRef.current = null;
-    }
     setCurrentIndex(Math.max(0, Math.min(idx, quiz.length)));
   }
 
@@ -245,13 +233,6 @@ export function QuizSection({
 
     if (choice === quiz[idx]?.answer) {
       notifyReward({ amount: 10, label: "+10 Coins" });
-
-      // Correct answer: auto-advance to the next question shortly after.
-      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
-      autoAdvanceTimeoutRef.current = setTimeout(() => {
-        autoAdvanceTimeoutRef.current = null;
-        setCurrentIndex((i) => (i === idx ? idx + 1 : i));
-      }, 900);
     }
   }
 
