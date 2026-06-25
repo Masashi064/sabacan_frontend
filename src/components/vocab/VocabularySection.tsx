@@ -63,7 +63,7 @@ function VocabFlipCard({
         }}
       >
         {/* FRONT */}
-        <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden]">
+        <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden] bg-sky-50/40">
           <CardContent className="p-4 h-full flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-3">
@@ -124,7 +124,7 @@ function VocabFlipCard({
         </Card>
 
         {/* BACK */}
-        <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)] bg-amber-50/60">
           <CardContent className="p-4 h-full flex flex-col gap-2">
             <div className="space-y-1">
               <p className="text-sm font-medium">Definition</p>
