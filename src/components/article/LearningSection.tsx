@@ -17,6 +17,9 @@ import { Button } from "@/components/ui/button";
 // section heading + toggle — for sections like Vocabulary where the
 // content itself (word cards) should be the visual focus, not a card
 // wrapped around another layer of cards.
+// `contentOutside` renders the header inside a Card but places children
+// below the Card rather than inside it — avoids card-within-card nesting
+// when the children are themselves cards (e.g. vocabulary flip cards).
 export function LearningSection({
   icon,
   title,
@@ -28,6 +31,7 @@ export function LearningSection({
   showLabel = "Show",
   hideLabel = "Hide",
   bare = false,
+  contentOutside = false,
   children,
 }: {
   icon: string;
@@ -40,6 +44,7 @@ export function LearningSection({
   showLabel?: string;
   hideLabel?: string;
   bare?: boolean;
+  contentOutside?: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
@@ -89,6 +94,17 @@ export function LearningSection({
     return (
       <div className="space-y-3">
         {header}
+        {isOpen ? <div>{children}</div> : null}
+      </div>
+    );
+  }
+
+  if (contentOutside) {
+    return (
+      <div className="space-y-3">
+        <Card>
+          <CardHeader>{header}</CardHeader>
+        </Card>
         {isOpen ? <div>{children}</div> : null}
       </div>
     );
