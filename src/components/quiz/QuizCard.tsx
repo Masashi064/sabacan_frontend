@@ -27,6 +27,7 @@ export function QuizCard({
       icon="🧠"
       title="Quiz"
       titleRight={progress ? `${progress.current} / ${progress.total}` : undefined}
+      description={quiz.length > 0 ? `${quiz.length} questions` : undefined}
     >
       {quiz.length > 0 ? (
         <QuizSection
