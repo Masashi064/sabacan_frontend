@@ -1,6 +1,7 @@
 import StudyStartMarker from "@/components/learning/StudyStartMarker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { QuizCard } from "@/components/quiz/QuizCard";
 import type { QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
@@ -205,7 +206,6 @@ export default async function ArticlePage({
               ? `${vocabItems.length} word${vocabItems.length === 1 ? "" : "s"} to learn`
               : undefined
           }
-          description="Tap cards to flip and save favorites."
           collapsible
           showLabel="Show vocabulary"
           hideLabel="Hide vocabulary"
@@ -219,7 +219,13 @@ export default async function ArticlePage({
             </p>
           )}
         </LearningSection>
+      </div>
 
+      {/* Quiz/Vocabulary above are the main learning content; Transcript
+          and Found a problem below are secondary/optional tools. */}
+      <Separator />
+
+      <div className="space-y-4">
         {/* Transcript */}
         <LearningSection
           icon="💬"
