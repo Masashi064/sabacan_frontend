@@ -51,7 +51,7 @@ function VocabFlipCard({
     <div className="perspective-[1200px]">
       <div
         className={cn(
-          "relative h-[280px] w-full transition-transform duration-500",
+          "relative h-[260px] w-full transition-transform duration-500",
           "[transform-style:preserve-3d]",
           flipped ? "[transform:rotateY(180deg)]" : ""
         )}
@@ -64,8 +64,8 @@ function VocabFlipCard({
       >
         {/* FRONT */}
         <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden]">
-          <CardContent className="p-5 h-full flex flex-col justify-between">
-            <div className="space-y-3">
+          <CardContent className="p-4 h-full flex flex-col justify-between">
+            <div className="space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="text-lg font-semibold leading-tight break-words">
@@ -125,7 +125,7 @@ function VocabFlipCard({
 
         {/* BACK */}
         <Card className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]">
-          <CardContent className="p-5 h-full flex flex-col gap-3">
+          <CardContent className="p-4 h-full flex flex-col gap-2">
             <div className="space-y-1">
               <p className="text-sm font-medium">Definition</p>
               <p className="text-sm text-muted-foreground break-words">
@@ -133,9 +133,9 @@ function VocabFlipCard({
               </p>
             </div>
 
-            <div className="space-y-1 flex-1">
-              <p className="text-sm font-medium">Example</p>
-              <div className="rounded-md border bg-muted/20 p-3 text-sm leading-relaxed overflow-auto">
+            <div className="flex-1 min-h-0 flex flex-col gap-1">
+              <p className="text-sm font-medium shrink-0">Example</p>
+              <div className="rounded-md border bg-muted/20 p-3 text-sm leading-relaxed overflow-auto flex-1">
                 <p className="break-words whitespace-pre-wrap">
                   {item.example ?? "—"}
                 </p>
@@ -281,8 +281,8 @@ export function VocabularySection({
     <div className="space-y-3">
       {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
 
-      {/* lg以上は2列（カード横幅に余裕）、モバイルは1列 */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      {/* モバイルは必ず1列、タブレット以上（sm+）で2列 */}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         {items.map((it) => (
           <VocabFlipCard
             key={it.word}

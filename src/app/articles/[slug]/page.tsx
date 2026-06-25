@@ -205,10 +205,11 @@ export default async function ArticlePage({
               ? `${vocabItems.length} word${vocabItems.length === 1 ? "" : "s"} to learn`
               : undefined
           }
-          description="Tap to flip cards and save favorites."
+          description="Tap cards to flip and save favorites."
           collapsible
           showLabel="Show vocabulary"
           hideLabel="Hide vocabulary"
+          bare
         >
           {vocabItems.length > 0 ? (
             <VocabularySection items={vocabItems} slug={slug} videoId={c.video_id ?? null} />
