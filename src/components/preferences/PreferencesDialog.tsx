@@ -62,10 +62,18 @@ export function PreferencesDialog({
         return;
       }
 
+      // Onboarding only ever asks about topics — channel preference is
+      // learned automatically from history (see get_recommended_articles)
+      // and is only manually editable later from the Account page, so
+      // skip fetching/showing it here to keep onboarding under ~30s.
+      const includeChannels = mode === "edit";
+
       const [filterOptionsRes, categoriesRes, channelsRes] = await Promise.all([
         supabase.rpc("get_filter_options"),
         supabase.from("favorite_categories").select("category_name").eq("user_id", user.id),
-        supabase.from("favorite_channels").select("channel_name").eq("user_id", user.id),
+        includeChannels
+          ? supabase.from("favorite_channels").select("channel_name").eq("user_id", user.id)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (!alive) return;
@@ -74,7 +82,7 @@ export function PreferencesDialog({
 
       const opts = (filterOptionsRes.data ?? {}) as FilterOptionsRpcResult;
       setCategoryOptions(opts.categories ?? []);
-      setChannelOptions(opts.channels ?? []);
+      setChannelOptions(includeChannels ? opts.channels ?? [] : []);
 
       setSelectedCategories(
         (categoriesRes.data ?? []).map((r: { category_name: string }) => r.category_name)
@@ -89,7 +97,7 @@ export function PreferencesDialog({
     return () => {
       alive = false;
     };
-  }, [open, supabase]);
+  }, [open, supabase, mode]);
 
   async function persistSelections() {
     if (!userId) return;
@@ -101,11 +109,17 @@ export function PreferencesDialog({
         .insert(selectedCategories.map((c) => ({ user_id: userId, category_name: c })));
     }
 
-    await supabase.from("favorite_channels").delete().eq("user_id", userId);
-    if (selectedChannels.length > 0) {
-      await supabase
-        .from("favorite_channels")
-        .insert(selectedChannels.map((c) => ({ user_id: userId, channel_name: c })));
+    // Onboarding never loads/shows channel selections — don't touch the
+    // table at all in that mode, or this would wipe out any channels the
+    // user already follows (e.g. via FollowChannelButton) before ever
+    // completing onboarding.
+    if (mode === "edit") {
+      await supabase.from("favorite_channels").delete().eq("user_id", userId);
+      if (selectedChannels.length > 0) {
+        await supabase
+          .from("favorite_channels")
+          .insert(selectedChannels.map((c) => ({ user_id: userId, channel_name: c })));
+      }
     }
   }
 
@@ -176,8 +190,9 @@ export function PreferencesDialog({
             {mode === "onboarding" ? "Set Your Preferences" : "Edit Preferences"}
           </DialogTitle>
           <DialogDescription>
-            Pick topics and channels you like to improve your recommendations. Both are
-            optional and you can change them anytime from your Account page.
+            {mode === "onboarding"
+              ? "Pick a few topics you like — it's optional and takes about 30 seconds. We'll learn your favorite channels automatically from what you read."
+              : "Pick topics and channels you like to improve your recommendations. Both are optional."}
           </DialogDescription>
         </DialogHeader>
 
@@ -191,12 +206,14 @@ export function PreferencesDialog({
               selected={selectedCategories}
               onChange={setSelectedCategories}
             />
-            <PreferenceChipPicker
-              label="What channels do you like?"
-              options={channelOptions}
-              selected={selectedChannels}
-              onChange={setSelectedChannels}
-            />
+            {mode === "edit" ? (
+              <PreferenceChipPicker
+                label="What channels do you like?"
+                options={channelOptions}
+                selected={selectedChannels}
+                onChange={setSelectedChannels}
+              />
+            ) : null}
           </div>
         )}
 
