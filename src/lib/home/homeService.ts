@@ -125,22 +125,23 @@ async function fetchArticleRows(
   // Completed slugs are always a small subset of the catalog, so we filter
   // by including/excluding that small set rather than enumerating every
   // candidate slug (a giant .in() list times out / exceeds URL limits).
+  // Fetched whenever the user is logged in — not just when the completion
+  // filter is active — since every card also needs to know whether to
+  // show a "✅ Completed" badge.
   let completedSlugs: string[] | null = null;
 
-  if (completion !== "all") {
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const user = userRes?.user ?? null;
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const user = userRes?.user ?? null;
 
-      if (user) {
-        completedSlugs = Array.from(await fetchCompletedAttemptSlugs(supabase, user.id));
-      } else {
-        completedSlugs = [];
-      }
-    } catch (error) {
-      console.error("Failed to build completion filter:", error);
-      completedSlugs = null;
+    if (user) {
+      completedSlugs = Array.from(await fetchCompletedAttemptSlugs(supabase, user.id));
+    } else if (completion !== "all") {
+      completedSlugs = [];
     }
+  } catch (error) {
+    console.error("Failed to fetch completed slugs:", error);
+    completedSlugs = null;
   }
 
   if (completion === "complete" && completedSlugs && completedSlugs.length === 0) {
@@ -155,7 +156,7 @@ async function fetchArticleRows(
     "slug, video_id, assigned_category, assigned_level, published_date, created_at, thumbnail_url, channel_name, video_title, video_length"
   );
 
-  if (completedSlugs && completedSlugs.length > 0) {
+  if (completion !== "all" && completedSlugs && completedSlugs.length > 0) {
     const list = `(${completedSlugs.map((s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")})`;
     qb = completion === "complete" ? qb.in("slug", completedSlugs) : qb.not("slug", "in", list);
   }
@@ -168,7 +169,11 @@ async function fetchArticleRows(
     return { rows: [], hasMore: false, totalCount: 0, fetchError: error.message };
   }
 
-  const allRows = (data as unknown as CategoryRow[]) ?? [];
+  const completedSet = new Set(completedSlugs ?? []);
+  const allRows = ((data as unknown as CategoryRow[]) ?? []).map((row) => ({
+    ...row,
+    is_completed: completedSet.has(row.slug),
+  }));
   const hasMore = allRows.length > pageSize;
   const rows = hasMore ? allRows.slice(0, pageSize) : allRows;
   const totalCount = count ?? 0;

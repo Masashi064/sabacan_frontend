@@ -25,7 +25,14 @@ export function CompactArticleCard({
 
   return (
     <Link href={href} className="block w-44 sm:w-52 shrink-0 snap-start">
-      <Card className="h-full overflow-hidden hover:shadow-sm transition-shadow">
+      <Card
+        className={[
+          "h-full overflow-hidden cursor-pointer",
+          "transition-all duration-200 ease-out",
+          "hover:-translate-y-0.5 hover:shadow-md",
+          "active:scale-[0.98] active:duration-75 active:shadow-sm",
+        ].join(" ")}
+      >
         <div className="relative">
           {article.thumbnailUrl ? (
             <img

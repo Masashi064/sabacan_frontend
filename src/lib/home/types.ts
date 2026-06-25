@@ -19,6 +19,9 @@ export type CategoryRow = {
   channel_name: string | null;
   video_title: string | null;
   video_length: string | null;
+  // Attached client-side (not a real categories column) when the
+  // current user has a completed quiz_attempts row for this slug.
+  is_completed?: boolean;
 };
 
 export type HomeData = {

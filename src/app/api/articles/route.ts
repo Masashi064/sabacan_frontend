@@ -34,6 +34,7 @@ export async function GET(req: Request) {
     assignedLevel: row.assigned_level,
     publishedDate: row.published_date,
     videoLength: row.video_length,
+    isCompleted: row.is_completed,
   }));
 
   return NextResponse.json({ rows: articles, hasMore, totalCount });
