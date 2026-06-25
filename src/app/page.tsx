@@ -61,7 +61,7 @@ export default async function Home({
           ) : null}
 
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold">Videos</h2>
+            <h2 className="text-xl font-semibold">🎬 Videos</h2>
 
             {/* Mobile/Tablet: Filters button only (Sheet) */}
             <div className="lg:hidden">

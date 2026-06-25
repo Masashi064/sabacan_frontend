@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatVideoLength } from "@/lib/utils";
@@ -8,7 +9,9 @@ import type { ArticleCardData } from "@/components/ArticleCard";
 // a substitute for the full article-grid card (ArticleCard). No category/
 // level badges, no follow button — just enough to recognize and open the
 // article. Fixed width + fixed-height title area so every card in a
-// HorizontalScrollShelf row lines up regardless of title length.
+// HorizontalScrollShelf row lines up regardless of title length. Wider/
+// shorter than a typical thumbnail card so a 2-line title rarely wraps
+// to a 3rd line.
 export function CompactArticleCard({
   article,
   href,
@@ -21,18 +24,18 @@ export function CompactArticleCard({
   const duration = formatVideoLength(article.videoLength);
 
   return (
-    <Link href={href} className="block w-32 sm:w-36 shrink-0 snap-start">
+    <Link href={href} className="block w-44 sm:w-52 shrink-0 snap-start">
       <Card className="h-full overflow-hidden hover:shadow-sm transition-shadow">
         <div className="relative">
           {article.thumbnailUrl ? (
             <img
               src={article.thumbnailUrl}
               alt={article.videoTitle}
-              className="h-16 sm:h-20 w-full object-cover"
+              className="h-20 w-full object-cover"
               loading="lazy"
             />
           ) : (
-            <div className="h-16 sm:h-20 w-full bg-muted" />
+            <div className="h-20 w-full bg-muted" />
           )}
 
           {reason ? (
@@ -53,7 +56,10 @@ export function CompactArticleCard({
             {article.channelName ?? "Unknown channel"}
           </p>
           {duration ? (
-            <p className="text-[11px] text-muted-foreground">{duration}</p>
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {duration}
+            </p>
           ) : null}
         </div>
       </Card>
