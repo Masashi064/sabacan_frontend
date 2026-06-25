@@ -4,6 +4,8 @@ import Script from "next/script"; // ✅ 追加
 import "./globals.css";
 import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
+import { CoinProvider } from "@/lib/coins/CoinProvider";
+import { CoinToastLayer } from "@/components/CoinToastLayer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,8 +49,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground">
-        <Header />
-        {children}
+        <CoinProvider>
+          <Header />
+          {children}
+          <CoinToastLayer />
+        </CoinProvider>
 
         {/* ✅ SPA遷移のPV計測 */}
         <GaPageView />

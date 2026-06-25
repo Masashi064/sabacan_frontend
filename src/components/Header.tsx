@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 import { BookOpen, LogOut, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,31 +17,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { SearchDialog } from "@/components/SearchDialog";
-
-function getDisplayName(user: User) {
-  const md: any = user.user_metadata ?? {};
-  return (
-    md.full_name ||
-    md.name ||
-    md.user_name ||
-    md.preferred_username ||
-    user.email ||
-    "Account"
-  );
-}
-
-function getAvatarUrl(user: User) {
-  const md: any = user.user_metadata ?? {};
-  return md.avatar_url || md.picture || null;
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "U";
-  const first = parts[0]?.[0] ?? "U";
-  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
-  return (first + last).toUpperCase();
-}
+import { CoinBadge } from "@/components/CoinBadge";
+import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 
 export function Header() {
   const supabase = useMemo(() => supabaseBrowser(), []);
@@ -81,6 +58,7 @@ export function Header() {
         {/* Right */}
         <div className="flex items-center gap-2">
           <SearchDialog />
+          <CoinBadge hasSession={!!user} />
           {!user ? (
             <Button asChild>
               <Link href="/login">Login</Link>

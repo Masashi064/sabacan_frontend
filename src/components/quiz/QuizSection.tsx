@@ -2,14 +2,22 @@
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { gaEvent } from "@/lib/ga";
+import { useCoins } from "@/lib/coins/CoinProvider";
 
 export type QuizQuestion = {
   question: string;
   choices: string[];
   answer: string;
   explanation?: string;
+};
+
+type CoinResult = {
+  awarded: number;
+  isFirst: boolean;
+  bonus: number;
 };
 
 const STUDY_CAP_SECONDS = 45 * 60; // 2700 (safety cap)
@@ -65,7 +73,9 @@ export function QuizSection({
   videoId: string | null;
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+  const { notifyReward, refreshBalance } = useCoins();
   const [selected, setSelected] = React.useState<Record<number, string>>({});
+  const [currentIndex, setCurrentIndex] = React.useState(0);
 
   // progress
   const answeredCount = Object.keys(selected).length;
@@ -74,15 +84,39 @@ export function QuizSection({
     return acc + (s && s === q.answer ? 1 : 0);
   }, 0);
 
+  const showResults = quiz.length > 0 && currentIndex >= quiz.length;
+
   // fallback: first answer -> finished
   const firstAnswerAtMsRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
+  const coinAwardSubmittedRef = React.useRef(false);
+  const bonusToastSentRef = React.useRef(false);
   const quizCompleteSentRef = React.useRef(false);
+  const autoAdvanceTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+    };
+  }, []);
+
+  function goTo(idx: number) {
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = null;
+    }
+    setCurrentIndex(Math.max(0, Math.min(idx, quiz.length)));
+  }
 
   const [saveStatus, setSaveStatus] = React.useState<
     "idle" | "saving" | "saved" | "error" | "skipped"
   >("idle");
   const [saveError, setSaveError] = React.useState<string | null>(null);
+
+  const [coinAwardStatus, setCoinAwardStatus] = React.useState<
+    "idle" | "awarding" | "awarded" | "skipped" | "error"
+  >("idle");
+  const [coinResult, setCoinResult] = React.useState<CoinResult | null>(null);
 
   async function saveAttemptOnce() {
     if (submittedRef.current) return;
@@ -134,6 +168,38 @@ export function QuizSection({
     setSaveStatus("saved");
   }
 
+  async function awardCoinsOnce() {
+    if (coinAwardSubmittedRef.current) return;
+    coinAwardSubmittedRef.current = true;
+
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) {
+      setCoinAwardStatus("skipped");
+      return;
+    }
+
+    setCoinAwardStatus("awarding");
+
+    const { data, error } = await supabase.rpc("award_quiz_coins", {
+      p_slug: slug,
+      p_correct_count: correctCount,
+      p_total_questions: quiz.length,
+    });
+
+    if (error) {
+      setCoinAwardStatus("error");
+      return;
+    }
+
+    setCoinResult({
+      awarded: data.awarded,
+      isFirst: data.is_first_completion,
+      bonus: data.bonus_amount,
+    });
+    setCoinAwardStatus("awarded");
+    void refreshBalance();
+  }
+
   // Save the moment all questions are answered
   React.useEffect(() => {
     if (quiz.length === 0) return;
@@ -144,42 +210,93 @@ export function QuizSection({
     }
 
     void saveAttemptOnce();
+    void awardCoinsOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answeredCount, quiz.length]);
+
+  // Bonus toast, once, when the results screen reveals a perfect first attempt
+  React.useEffect(() => {
+    if (!showResults) return;
+    if (bonusToastSentRef.current) return;
+    if (coinAwardStatus !== "awarded" || !coinResult) return;
+    if (coinResult.isFirst && coinResult.bonus > 0) {
+      bonusToastSentRef.current = true;
+      notifyReward({ amount: coinResult.bonus, label: "+30 Bonus!" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showResults, coinAwardStatus, coinResult]);
+
+  function handleChoice(idx: number, choice: string) {
+    if (typeof selected[idx] === "string") return; // lock after first pick
+
+    // fallback timer start (first answer)
+    if (firstAnswerAtMsRef.current === null) {
+      firstAnswerAtMsRef.current = Date.now();
+    }
+
+    setSelected((prev) => ({ ...prev, [idx]: choice }));
+
+    if (choice === quiz[idx]?.answer) {
+      notifyReward({ amount: 10, label: "+10 Coins" });
+
+      // Correct answer: auto-advance to the next question shortly after.
+      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = setTimeout(() => {
+        autoAdvanceTimeoutRef.current = null;
+        setCurrentIndex((i) => (i === idx ? idx + 1 : i));
+      }, 900);
+    }
+  }
+
+  function firstUnansweredIndex() {
+    for (let i = 0; i < quiz.length; i++) {
+      if (typeof selected[i] !== "string") return i;
+    }
+    return null;
+  }
+
+  if (quiz.length === 0) return null;
 
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-xl font-semibold">Quiz</h2>
-          <p className="text-sm text-muted-foreground">
-            {answeredCount}/{quiz.length} answered • {correctCount} correct
-          </p>
-        </div>
-
-        <div className="text-xs text-muted-foreground text-right">
-          {saveStatus === "idle" ? null : saveStatus === "saving" ? (
-            <span>Saving…</span>
-          ) : saveStatus === "saved" ? (
-            <span>Saved ✅</span>
-          ) : saveStatus === "skipped" ? (
-            <span>Login to save progress</span>
-          ) : (
-            <span className="text-red-600">Save failed</span>
-          )}
-          {saveStatus === "error" && saveError ? (
-            <div className="mt-1 max-w-[320px] truncate" title={saveError}>
-              {saveError}
-            </div>
+          {!showResults ? (
+            <p className="text-sm text-muted-foreground">
+              Question {Math.min(currentIndex + 1, quiz.length)} of {quiz.length}
+            </p>
           ) : null}
         </div>
+
+        {!showResults ? (
+          <div className="text-xs text-muted-foreground text-right">
+            {saveStatus === "idle" ? null : saveStatus === "saving" ? (
+              <span>Saving…</span>
+            ) : saveStatus === "saved" ? (
+              <span>Saved ✅</span>
+            ) : saveStatus === "skipped" ? (
+              <span>Login to save progress</span>
+            ) : (
+              <span className="text-red-600">Save failed</span>
+            )}
+            {saveStatus === "error" && saveError ? (
+              <div className="mt-1 max-w-[320px] truncate" title={saveError}>
+                {saveError}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      <div className="space-y-4">
-        {quiz.map((q, idx) => {
+      {!showResults ? (
+        (() => {
+          const idx = currentIndex;
+          const q = quiz[idx];
           const picked = selected[idx];
           const isAnswered = typeof picked === "string";
           const isCorrect = isAnswered && picked === q.answer;
+          const isLast = idx === quiz.length - 1;
 
           return (
             <Card key={idx} className="overflow-hidden">
@@ -220,16 +337,7 @@ export function QuizSection({
                         key={choice}
                         type="button"
                         className={cn(base, state)}
-                        onClick={() => {
-                          if (isAnswered) return; // lock after first pick
-
-                          // fallback timer start (first answer)
-                          if (firstAnswerAtMsRef.current === null) {
-                            firstAnswerAtMsRef.current = Date.now();
-                          }
-
-                          setSelected((prev) => ({ ...prev, [idx]: choice }));
-                        }}
+                        onClick={() => handleChoice(idx, choice)}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <span>{choice}</span>
@@ -254,11 +362,74 @@ export function QuizSection({
                     ) : null}
                   </div>
                 ) : null}
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => goTo(idx - 1)}
+                    disabled={idx === 0}
+                  >
+                    Back
+                  </Button>
+                  <Button onClick={() => goTo(idx + 1)}>
+                    {isLast ? "See results" : "Next"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );
-        })}
-      </div>
+        })()
+      ) : answeredCount < quiz.length ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Quiz not finished</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Answer all {quiz.length} questions to see your results and earn coins.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const idx = firstUnansweredIndex();
+                if (idx !== null) goTo(idx);
+              }}
+            >
+              Go to unanswered question
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {correctCount} / {quiz.length} Correct!
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {coinAwardStatus === "skipped" ? (
+              <p className="text-sm text-muted-foreground">
+                Login to earn coins for completing quizzes.
+              </p>
+            ) : coinAwardStatus === "error" ? (
+              <p className="text-sm text-muted-foreground">Coins could not be saved.</p>
+            ) : coinAwardStatus === "awarded" && coinResult ? (
+              <>
+                <p className="text-base font-semibold text-emerald-700">
+                  +{coinResult.awarded} Coins
+                </p>
+                {coinResult.isFirst && coinResult.bonus > 0 ? (
+                  <p className="text-sm font-medium text-amber-600">
+                    Perfect! +{coinResult.bonus} Bonus!
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Awarding coins…</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 }
