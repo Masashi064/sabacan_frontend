@@ -2,7 +2,6 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ArticleCardData } from "@/components/ArticleCard";
 import { ArticleFilters } from "@/components/ArticleFilters";
-import { HomeHeader } from "@/components/home/HomeHeader";
 import { MobileFiltersSheet } from "@/components/home/MobileFiltersSheet";
 import { ArticleGrid } from "@/components/home/ArticleGrid";
 import { FilterStatus } from "@/components/home/FilterStatus";
@@ -26,7 +25,7 @@ export default async function Home({
   const [
     { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError },
     recommendations,
-  ] = await Promise.all([getHomeData(supabase, sp), getRecommendedArticles(supabase)]);
+  ] = await Promise.all([getHomeData(supabase, sp), getRecommendedArticles(supabase, 20)]);
 
   const articles: ArticleCardData[] = rows.map((row) => ({
     slug: row.slug,
@@ -41,19 +40,7 @@ export default async function Home({
 
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
-      <HomeHeader />
-
       <RecommendationsSection items={recommendations} />
-
-      {/* Mobile/Tablet: Filters button only (Sheet) */}
-      <div className="lg:hidden">
-        <MobileFiltersSheet
-          channelOptions={channelOptions}
-          categoryOptions={categoryOptions}
-          levelOptions={levelOptions}
-          initialCount={totalCount}
-        />
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         {/* Desktop: sidebar filters */}
@@ -72,6 +59,20 @@ export default async function Home({
               <p className="mt-2 text-sm text-muted-foreground">{fetchError}</p>
             </section>
           ) : null}
+
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-xl font-semibold">Videos</h2>
+
+            {/* Mobile/Tablet: Filters button only (Sheet) */}
+            <div className="lg:hidden">
+              <MobileFiltersSheet
+                channelOptions={channelOptions}
+                categoryOptions={categoryOptions}
+                levelOptions={levelOptions}
+                initialCount={totalCount}
+              />
+            </div>
+          </div>
 
           <FilterStatus totalCount={totalCount} searchParams={sp} />
 

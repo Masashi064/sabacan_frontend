@@ -6,7 +6,7 @@ export function RecommendationsSection({ items }: { items: RecommendedArticle[] 
   if (items.length === 0) return null;
 
   return (
-    <HorizontalScrollShelf title="Today's Recommendations">
+    <HorizontalScrollShelf title="✨ Picked for You">
       {items.map((item) => (
         <CompactArticleCard
           key={item.slug}

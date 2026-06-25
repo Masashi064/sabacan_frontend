@@ -21,7 +21,7 @@ type RecommendedArticleRow = {
 // are an enhancement, not a hard dependency.
 export async function getRecommendedArticles(
   supabase: SupabaseClient,
-  limit = 3
+  limit = 20
 ): Promise<RecommendedArticle[]> {
   const { data, error } = await supabase.rpc("get_recommended_articles", {
     p_limit: limit,
