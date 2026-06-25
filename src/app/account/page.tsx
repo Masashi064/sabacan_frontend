@@ -3,23 +3,17 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-} from "recharts";
-import { RefreshCw } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
+import { RefreshCw, LogOut } from "lucide-react";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { TrendChart } from "@/components/analytics/TrendChart";
+import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 
 type PerformanceOverviewRow = {
   user_id: string;
@@ -76,13 +70,22 @@ type FavoriteWordRow = {
   created_at: string;
 };
 
+type Section<T> = {
+  data: T;
+  loading: boolean;
+  error: string | null;
+};
+
+function initialSection<T>(data: T): Section<T> {
+  return { data, loading: true, error: null };
+}
+
 function formatDate(yyyy_mm_dd: string) {
   // show as MM/DD for charts (light & compact)
   const [y, m, d] = yyyy_mm_dd.split("-").map((x) => Number(x));
   if (!y || !m || !d) return yyyy_mm_dd;
   return `${m}/${d}`;
 }
-
 
 function getTodayAttempts(data: AttemptsDailyFilledRow[]) {
   if (data.length === 0) return 0;
@@ -103,110 +106,146 @@ export default function AccountPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
 
-  const [loading, setLoading] = React.useState(true);
-  const [userId, setUserId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [authChecked, setAuthChecked] = React.useState(false);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [signingOut, setSigningOut] = React.useState(false);
 
-  const [perf, setPerf] = React.useState<PerformanceOverviewRow | null>(null);
-  const [streak, setStreak] = React.useState<StreakRow | null>(null);
-
-  const [attemptsDaily, setAttemptsDaily] = React.useState<AttemptsDailyFilledRow[]>([]);
-  const [attemptsCum, setAttemptsCum] = React.useState<AttemptsCumulativeRow[]>([]);
-  const [scoresDaily, setScoresDaily] = React.useState<ScoresDailyFilledRow[]>([]);
-  const [calendar90, setCalendar90] = React.useState<CalendarDailyFilledRow[]>([]);
-
-  const [recentFav, setRecentFav] = React.useState<FavoriteWordRow[]>([]);
+  const [perf, setPerf] = React.useState<Section<PerformanceOverviewRow | null>>(
+    initialSection(null)
+  );
+  const [streak, setStreak] = React.useState<Section<StreakRow | null>>(initialSection(null));
+  const [attemptsDaily, setAttemptsDaily] = React.useState<
+    Section<AttemptsDailyFilledRow[]>
+  >(initialSection([]));
+  const [attemptsCum, setAttemptsCum] = React.useState<Section<AttemptsCumulativeRow[]>>(
+    initialSection([])
+  );
+  const [scoresDaily, setScoresDaily] = React.useState<Section<ScoresDailyFilledRow[]>>(
+    initialSection([])
+  );
+  const [calendar90, setCalendar90] = React.useState<Section<CalendarDailyFilledRow[]>>(
+    initialSection([])
+  );
+  const [recentFav, setRecentFav] = React.useState<Section<FavoriteWordRow[]>>(
+    initialSection([])
+  );
 
   async function loadAll() {
-    setError(null);
-    setLoading(true);
-
     const { data: userRes, error: userErr } = await supabase.auth.getUser();
-    const user = userRes?.user;
+    const currentUser = userRes?.user;
 
-    if (userErr || !user) {
+    if (userErr || !currentUser) {
       router.replace("/login?next=/account");
       return;
     }
 
-    setUserId(user.id);
+    setUser(currentUser);
+    setAuthChecked(true);
 
-    const [
-      perfRes,
-      streakRes,
-      attemptsDailyRes,
-      attemptsCumRes,
-      scoresDailyRes,
-      calendarRes,
-      favRecentRes,
-    ] = await Promise.all([
-      supabase
-        .from("v_account_performance_overview")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("v_account_learning_streaks")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("v_account_quiz_attempts_daily_30_filled")
-        .select("day,attempts_count")
-        .eq("user_id", user.id)
-        .order("day", { ascending: true }),
-      supabase
-        .from("v_account_quiz_attempts_cumulative_30")
-        .select("day,attempts_count,attempts_cumulative")
-        .eq("user_id", user.id)
-        .order("day", { ascending: true }),
-      supabase
-        .from("v_account_quiz_scores_daily_30_filled")
-        .select("day,attempts_count,avg_score_percent,accuracy_percent")
-        .eq("user_id", user.id)
-        .order("day", { ascending: true }),
-      supabase
-        .from("v_account_learning_calendar_daily_90_filled")
-        .select("day,events_count,duration_seconds_sum,did_quiz,did_favorite,did_review")
-        .eq("user_id", user.id)
-        .order("day", { ascending: true }),
-      supabase
-        .from("favorite_words")
-        .select("word,pronunciation,definition,example,slug,video_id,created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(12),
-    ]);
+    setPerf(initialSection(null));
+    setStreak(initialSection(null));
+    setAttemptsDaily(initialSection([]));
+    setAttemptsCum(initialSection([]));
+    setScoresDaily(initialSection([]));
+    setCalendar90(initialSection([]));
+    setRecentFav(initialSection([]));
 
-    const firstErr =
-      perfRes.error ||
-      streakRes.error ||
-      attemptsDailyRes.error ||
-      attemptsCumRes.error ||
-      scoresDailyRes.error ||
-      calendarRes.error ||
-      favRecentRes.error;
+    const uid = currentUser.id;
 
-    if (firstErr) {
-      setError(firstErr.message);
-    }
+    supabase
+      .from("v_account_performance_overview")
+      .select("*")
+      .eq("user_id", uid)
+      .maybeSingle()
+      .then(({ data, error }) =>
+        setPerf({ data: (data as any) ?? null, loading: false, error: error?.message ?? null })
+      );
 
-    setPerf((perfRes.data as any) ?? null);
-    setStreak((streakRes.data as any) ?? null);
+    supabase
+      .from("v_account_learning_streaks")
+      .select("*")
+      .eq("user_id", uid)
+      .maybeSingle()
+      .then(({ data, error }) =>
+        setStreak({ data: (data as any) ?? null, loading: false, error: error?.message ?? null })
+      );
 
-    setAttemptsDaily((attemptsDailyRes.data as any) ?? []);
-    setAttemptsCum((attemptsCumRes.data as any) ?? []);
-    setScoresDaily((scoresDailyRes.data as any) ?? []);
-    setCalendar90((calendarRes.data as any) ?? []);
-    setRecentFav((favRecentRes.data as any) ?? []);
+    supabase
+      .from("v_account_quiz_attempts_daily_30_filled")
+      .select("day,attempts_count")
+      .eq("user_id", uid)
+      .order("day", { ascending: true })
+      .then(({ data, error }) =>
+        setAttemptsDaily({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
+      );
 
-    setLoading(false);
+    supabase
+      .from("v_account_quiz_attempts_cumulative_30")
+      .select("day,attempts_count,attempts_cumulative")
+      .eq("user_id", uid)
+      .order("day", { ascending: true })
+      .then(({ data, error }) =>
+        setAttemptsCum({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
+      );
+
+    supabase
+      .from("v_account_quiz_scores_daily_30_filled")
+      .select("day,attempts_count,avg_score_percent,accuracy_percent")
+      .eq("user_id", uid)
+      .order("day", { ascending: true })
+      .then(({ data, error }) =>
+        setScoresDaily({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
+      );
+
+    supabase
+      .from("v_account_learning_calendar_daily_90_filled")
+      .select("day,events_count,duration_seconds_sum,did_quiz,did_favorite,did_review")
+      .eq("user_id", uid)
+      .order("day", { ascending: true })
+      .then(({ data, error }) =>
+        setCalendar90({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
+      );
+
+    supabase
+      .from("favorite_words")
+      .select("word,pronunciation,definition,example,slug,video_id,created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(12)
+      .then(({ data, error }) =>
+        setRecentFav({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
+      );
   }
 
   React.useEffect(() => {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const anyLoading =
+    perf.loading ||
+    streak.loading ||
+    attemptsDaily.loading ||
+    attemptsCum.loading ||
+    scoresDaily.loading ||
+    calendar90.loading ||
+    recentFav.loading;
+
+  const sectionErrors = [
+    perf.error,
+    streak.error,
+    attemptsDaily.error,
+    attemptsCum.error,
+    scoresDaily.error,
+    calendar90.error,
+    recentFav.error,
+  ].filter((e): e is string => Boolean(e));
+
+  async function onSignOut() {
+    setSigningOut(true);
+    await supabase.auth.signOut();
+    router.replace("/login");
+  }
 
   // Calendar intensity (simple levels)
   function calendarCellClass(events: number) {
@@ -216,8 +255,6 @@ export default function AccountPage() {
     if (events === 3) return "bg-emerald-300";
     return "bg-emerald-400";
   }
-
-  const calCells = calendar90; // already 90 days filled
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
@@ -230,18 +267,55 @@ export default function AccountPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={loadAll} disabled={loading}>
+          <Button variant="outline" onClick={loadAll} disabled={anyLoading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
         </div>
       </div>
 
-      {error ? (
+      {sectionErrors.length > 0 ? (
         <Card>
-          <CardContent className="p-4 text-sm text-red-600">{error}</CardContent>
+          <CardContent className="p-4 space-y-1">
+            {sectionErrors.map((message, i) => (
+              <p key={i} className="text-sm text-red-600">
+                {message}
+              </p>
+            ))}
+          </CardContent>
         </Card>
       ) : null}
+
+      {/* Profile */}
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          {!authChecked ? (
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-12 w-12 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={getAvatarUrl(user!) ?? undefined} />
+                <AvatarFallback>{initials(getDisplayName(user!))}</AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-medium">{getDisplayName(user!)}</div>
+                <div className="text-sm text-muted-foreground">{user!.email}</div>
+              </div>
+            </div>
+          )}
+
+          <Button variant="outline" onClick={onSignOut} disabled={!authChecked || signingOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            {signingOut ? "Signing out…" : "Sign out"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Top summary cards */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
@@ -250,16 +324,20 @@ export default function AccountPage() {
             <CardTitle className="text-sm">Total Attempts</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {loading ? "—" : perf?.total_attempts ?? 0}
+            {perf.loading ? <Skeleton className="h-8 w-16" /> : perf.data?.total_attempts ?? 0}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Today's Attempts</CardTitle>
+            <CardTitle className="text-sm">Today&apos;s Attempts</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {loading ? "—" : getTodayAttempts(attemptsDaily)}
+            {attemptsDaily.loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              getTodayAttempts(attemptsDaily.data)
+            )}
           </CardContent>
         </Card>
 
@@ -268,7 +346,11 @@ export default function AccountPage() {
             <CardTitle className="text-sm">Average Score</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {loading ? "—" : `${perf?.avg_score_percent ?? 0}%`}
+            {perf.loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              `${perf.data?.avg_score_percent ?? 0}%`
+            )}
           </CardContent>
         </Card>
 
@@ -277,7 +359,11 @@ export default function AccountPage() {
             <CardTitle className="text-sm">Quiz Time (for now)</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
-            {loading ? "—" : secondsToHms(perf?.total_quiz_seconds ?? 0)}
+            {perf.loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              secondsToHms(perf.data?.total_quiz_seconds ?? 0)
+            )}
           </CardContent>
         </Card>
       </div>
@@ -291,97 +377,67 @@ export default function AccountPage() {
           <div>
             <div className="text-muted-foreground">Current</div>
             <div className="text-xl font-semibold">
-              {loading ? "—" : streak?.current_streak ?? 0} days
+              {streak.loading ? (
+                <Skeleton className="h-6 w-12" />
+              ) : (
+                `${streak.data?.current_streak ?? 0} days`
+              )}
             </div>
           </div>
           <div>
             <div className="text-muted-foreground">Longest</div>
             <div className="text-xl font-semibold">
-              {loading ? "—" : streak?.longest_streak ?? 0} days
+              {streak.loading ? (
+                <Skeleton className="h-6 w-12" />
+              ) : (
+                `${streak.data?.longest_streak ?? 0} days`
+              )}
             </div>
           </div>
           <div>
             <div className="text-muted-foreground">Last active</div>
             <div className="text-xl font-semibold">
-              {loading ? "—" : streak?.last_active_day ?? "—"}
+              {streak.loading ? <Skeleton className="h-6 w-20" /> : streak.data?.last_active_day ?? "—"}
             </div>
           </div>
         </CardContent>
       </Card>
-
-      
 
       {/* Charts */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="h-[360px]">
           <CardHeader>
             <CardTitle className="text-base">Cumulative Quiz Attempts (Last 30 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Running total of quiz attempts
-            </p>
+            <p className="text-sm text-muted-foreground">Running total of quiz attempts</p>
           </CardHeader>
           <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={attemptsCum.map((r) => ({
-                  ...r,
-                  dayLabel: formatDate(r.day),
-                }))}
-                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="dayLabel"
-                  tick={{ fontSize: 12 }}
-                  interval={4}
-                  tickMargin={8}
-                />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="attempts_cumulative"
-                  name="Cumulative Attempts"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {attemptsCum.loading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <TrendChart
+                data={attemptsCum.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                lines={[{ dataKey: "attempts_cumulative", name: "Cumulative Attempts" }]}
+                emptyMessage="No quiz attempts in the last 30 days yet."
+              />
+            )}
           </CardContent>
         </Card>
-        
+
         <Card className="h-[360px]">
           <CardHeader>
             <CardTitle className="text-base">Daily Quiz Attempts (Last 30 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Number of quiz attempts per day
-            </p>
+            <p className="text-sm text-muted-foreground">Number of quiz attempts per day</p>
           </CardHeader>
           <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={attemptsDaily.map((r) => ({
-                  ...r,
-                  dayLabel: formatDate(r.day),
-                }))}
-                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="dayLabel"
-                  tick={{ fontSize: 12 }}
-                  interval={4}
-                  tickMargin={8}
-                />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="attempts_count"
-                  name="Daily Attempts"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {attemptsDaily.loading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <TrendChart
+                data={attemptsDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                lines={[{ dataKey: "attempts_count", name: "Daily Attempts" }]}
+                emptyMessage="No quiz attempts in the last 30 days yet."
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -391,27 +447,19 @@ export default function AccountPage() {
             <p className="text-sm text-muted-foreground">Daily average score and accuracy</p>
           </CardHeader>
           <CardContent className="h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={scoresDaily.map((r) => ({
-                  ...r,
-                  dayLabel: formatDate(r.day),
-                }))}
-                margin={{ top: 10, right: 20, left: 0, bottom: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="dayLabel"
-                  tick={{ fontSize: 12 }}
-                  interval={4}
-                  tickMargin={8}
-                />
-                <YAxis tick={{ fontSize: 12 }} domain={[0, 100]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="avg_score_percent" name="Avg Score" dot={false} />
-                <Line type="monotone" dataKey="accuracy_percent" name="Accuracy" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            {scoresDaily.loading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <TrendChart
+                data={scoresDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                lines={[
+                  { dataKey: "avg_score_percent", name: "Avg Score" },
+                  { dataKey: "accuracy_percent", name: "Accuracy" },
+                ]}
+                yDomain={[0, 100]}
+                emptyMessage="No quiz scores in the last 30 days yet."
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -424,19 +472,25 @@ export default function AccountPage() {
             <p className="text-sm text-muted-foreground">Days with activity are highlighted.</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-14 gap-1">
-              {calCells.map((c) => (
-                <div
-                  key={c.day}
-                  className={[
-                    "h-4 w-full rounded",
-                    "border border-border/40",
-                    calendarCellClass(c.events_count),
-                  ].join(" ")}
-                  title={`${c.day} • events: ${c.events_count}`}
-                />
-              ))}
-            </div>
+            {calendar90.loading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : calendar90.data.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+            ) : (
+              <div className="grid grid-cols-14 gap-1">
+                {calendar90.data.map((c) => (
+                  <div
+                    key={c.day}
+                    className={[
+                      "h-4 w-full rounded",
+                      "border border-border/40",
+                      calendarCellClass(c.events_count),
+                    ].join(" ")}
+                    title={`${c.day} • events: ${c.events_count}`}
+                  />
+                ))}
+              </div>
+            )}
 
             <Separator />
 
@@ -452,15 +506,19 @@ export default function AccountPage() {
             <p className="text-sm text-muted-foreground">Latest 12 favorites</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : recentFav.length === 0 ? (
+            {recentFav.loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : recentFav.data.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No favorites yet. Go to an article and tap the heart icon.
               </p>
             ) : (
               <div className="space-y-2">
-                {recentFav.map((w) => (
+                {recentFav.data.map((w) => (
                   <div
                     key={w.word}
                     className="rounded-md border p-3 flex items-start justify-between gap-4"
@@ -497,4 +555,3 @@ export default function AccountPage() {
     </main>
   );
 }
-
