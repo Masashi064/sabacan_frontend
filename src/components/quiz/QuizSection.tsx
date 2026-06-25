@@ -66,10 +66,12 @@ export function QuizSection({
   quiz,
   slug,
   videoId,
+  onProgressChange,
 }: {
   quiz: QuizQuestion[];
   slug: string;
   videoId: string | null;
+  onProgressChange?: (current: number, total: number) => void;
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
   const { notifyReward, refreshBalance } = useCoins();
@@ -84,6 +86,12 @@ export function QuizSection({
   }, 0);
 
   const showResults = quiz.length > 0 && currentIndex >= quiz.length;
+
+  React.useEffect(() => {
+    if (quiz.length === 0) return;
+    onProgressChange?.(Math.min(currentIndex + 1, quiz.length), quiz.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, quiz.length]);
 
   // fallback: first answer -> finished
   const firstAnswerAtMsRef = React.useRef<number | null>(null);
@@ -258,34 +266,11 @@ export function QuizSection({
 
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          {!showResults ? (
-            <p className="text-sm text-muted-foreground">
-              Question {Math.min(currentIndex + 1, quiz.length)} of {quiz.length}
-            </p>
-          ) : null}
-        </div>
-
-        {!showResults ? (
-          <div className="text-xs text-muted-foreground text-right">
-            {saveStatus === "idle" ? null : saveStatus === "saving" ? (
-              <span>Saving…</span>
-            ) : saveStatus === "saved" ? (
-              <span>Saved ✅</span>
-            ) : saveStatus === "skipped" ? (
-              <span>Login to save progress</span>
-            ) : (
-              <span className="text-red-600">Save failed</span>
-            )}
-            {saveStatus === "error" && saveError ? (
-              <div className="mt-1 max-w-[320px] truncate" title={saveError}>
-                {saveError}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+      {!showResults && saveStatus === "error" ? (
+        <p className="text-xs text-red-600" title={saveError ?? undefined}>
+          Save failed{saveError ? `: ${saveError}` : ""}
+        </p>
+      ) : null}
 
       {!showResults ? (
         (() => {

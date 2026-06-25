@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 export function LearningSection({
   icon,
   title,
+  titleRight,
   meta,
   description,
   collapsible = false,
@@ -25,6 +26,7 @@ export function LearningSection({
 }: {
   icon: string;
   title: string;
+  titleRight?: React.ReactNode;
   meta?: string;
   description?: string;
   collapsible?: boolean;
@@ -39,10 +41,15 @@ export function LearningSection({
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
-        <div className="space-y-1">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span aria-hidden="true">{icon}</span>
-            {title}
+        <div className="flex-1 space-y-1">
+          <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <span className="flex items-center gap-2">
+              <span aria-hidden="true">{icon}</span>
+              {title}
+            </span>
+            {titleRight ? (
+              <span className="text-sm font-normal text-muted-foreground">{titleRight}</span>
+            ) : null}
           </CardTitle>
           {meta ? <p className="text-sm font-medium">{meta}</p> : null}
           {description ? (

@@ -1,7 +1,8 @@
 import StudyStartMarker from "@/components/learning/StudyStartMarker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { QuizSection, type QuizQuestion } from "@/components/quiz/QuizSection";
+import { QuizCard } from "@/components/quiz/QuizCard";
+import type { QuizQuestion } from "@/components/quiz/QuizSection";
 import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
 import { ReportIssueButton } from "@/components/article/ReportIssueButton";
 import { LearningSection } from "@/components/article/LearningSection";
@@ -193,19 +194,7 @@ export default async function ArticlePage({
 
       <div className="space-y-4">
         {/* Quiz */}
-        <LearningSection
-          icon="🧠"
-          title="Quiz"
-          description="Answer 5 questions about the video."
-        >
-          {quizList.length > 0 ? (
-            <QuizSection quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Quiz data is not available yet for this article.
-            </p>
-          )}
-        </LearningSection>
+        <QuizCard quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
 
         {/* Vocabulary */}
         <LearningSection
