@@ -123,28 +123,9 @@ export default async function ArticlePage({
         ← Back
       </a>
 
-      <header className="space-y-2">
+      <header>
         <h1 className="text-2xl font-semibold">{c.video_title ?? c.slug}</h1>
-        <p className="text-sm text-muted-foreground">
-          {c.channel_name ?? "Unknown channel"}
-          {c.published_date ? ` • ${c.published_date}` : ""}
-          {formatVideoLength(c.video_length) ? ` • ${formatVideoLength(c.video_length)}` : ""}
-          {c.assigned_level ? ` • ${c.assigned_level}` : ""}
-          {c.assigned_category ? ` • ${c.assigned_category}` : ""}
-        </p>
       </header>
-
-      {/* Lead */}
-      <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Lead</h2>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm leading-relaxed">
-              {leadIntro ?? "Lead intro is not available yet."}
-            </p>
-          </CardContent>
-        </Card>
-      </section>
 
       {/* YouTube */}
       <section className="space-y-2">
@@ -181,6 +162,25 @@ export default async function ArticlePage({
             </CardContent>
           </Card>
         )}
+      </section>
+
+      {/* Summary (article meta + the former "Lead" text) */}
+      <section className="space-y-2">
+        <h2 className="text-xl font-semibold">Summary</h2>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {c.channel_name ?? "Unknown channel"}
+              {c.published_date ? ` • ${c.published_date}` : ""}
+              {formatVideoLength(c.video_length) ? ` • ${formatVideoLength(c.video_length)}` : ""}
+              {c.assigned_level ? ` • ${c.assigned_level}` : ""}
+              {c.assigned_category ? ` • ${c.assigned_category}` : ""}
+            </p>
+            <p className="text-sm leading-relaxed">
+              {leadIntro ?? "Lead intro is not available yet."}
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Vocabulary */}
