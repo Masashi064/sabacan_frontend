@@ -8,6 +8,8 @@ import { ArticleGrid } from "@/components/home/ArticleGrid";
 import { FilterStatus } from "@/components/home/FilterStatus";
 
 import { getHomeData } from "@/lib/home/homeService";
+import { getRecommendedArticles } from "@/lib/home/recommendations";
+import { RecommendationsSection } from "@/components/home/RecommendationsSection";
 import type { HomeSearchParams } from "@/lib/home/types";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +23,10 @@ export default async function Home({
 
   const supabase = await supabaseServer();
 
-  const { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError } =
-    await getHomeData(supabase, sp);
+  const [
+    { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError },
+    recommendations,
+  ] = await Promise.all([getHomeData(supabase, sp), getRecommendedArticles(supabase)]);
 
   const articles: ArticleCardData[] = rows.map((row) => ({
     slug: row.slug,
@@ -38,6 +42,8 @@ export default async function Home({
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       <HomeHeader />
+
+      <RecommendationsSection items={recommendations} />
 
       {/* Mobile/Tablet: Filters button only (Sheet) */}
       <div className="lg:hidden">
