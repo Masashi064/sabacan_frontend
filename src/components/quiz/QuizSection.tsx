@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { gaEvent } from "@/lib/ga";
 import { useCoins } from "@/lib/coins/CoinProvider";
+import { useAchievements } from "@/lib/achievements/AchievementProvider";
 
 export type QuizQuestion = {
   question: string;
@@ -75,6 +76,7 @@ export function QuizSection({
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
   const { notifyReward, refreshBalance } = useCoins();
+  const { notifyAchievements } = useAchievements();
   const [selected, setSelected] = React.useState<Record<number, string>>({});
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
@@ -97,6 +99,7 @@ export function QuizSection({
   const firstAnswerAtMsRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
   const coinAwardSubmittedRef = React.useRef(false);
+  const achievementCheckedRef = React.useRef(false);
   const bonusToastSentRef = React.useRef(false);
   const quizCompleteSentRef = React.useRef(false);
   function goTo(idx: number) {
@@ -161,6 +164,9 @@ export function QuizSection({
     }
 
     setSaveStatus("saved");
+
+    // Check achievements after quiz_attempt is persisted
+    void checkAchievementsOnce();
   }
 
   async function awardCoinsOnce() {
@@ -193,6 +199,29 @@ export function QuizSection({
     });
     setCoinAwardStatus("awarded");
     void refreshBalance();
+  }
+
+  async function checkAchievementsOnce() {
+    if (achievementCheckedRef.current) return;
+    achievementCheckedRef.current = true;
+
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes?.user) return;
+
+    const { data, error } = await supabase.rpc("check_and_unlock_achievements", {
+      p_slug: slug,
+    });
+
+    if (error) {
+      console.error("[achievements] check failed:", error.message);
+      return;
+    }
+
+    const unlocks = Array.isArray(data) ? data : [];
+    if (unlocks.length > 0) {
+      void refreshBalance();
+      notifyAchievements(unlocks);
+    }
   }
 
   // Save the moment all questions are answered
