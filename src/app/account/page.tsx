@@ -390,9 +390,8 @@ export default function AccountPage() {
         </Card>
       ) : null}
 
-      {/* ─── 👤 Account ─────────────────────────────────────── */}
+      {/* ─── 👤 Profile ─────────────────────────────────────── */}
       <section className="space-y-3">
-        <SectionHeading icon="👤" title="Account" />
         <Card>
           <CardContent className="p-6 space-y-4">
             {!authChecked ? (
