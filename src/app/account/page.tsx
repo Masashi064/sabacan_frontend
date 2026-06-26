@@ -8,6 +8,7 @@ import { RefreshCw, LogOut } from "lucide-react";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -368,35 +369,64 @@ export default function AccountPage() {
 
             {/* Content Preferences */}
             <div className="space-y-3">
-              <p className="text-sm font-medium">🎯 Content Preferences</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">🎯 Content Preferences</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                  onClick={() => setEditPrefsOpen(true)}
+                >
+                  Edit
+                </Button>
+              </div>
               {contentPrefs.loading ? (
                 <div className="space-y-2">
-                  <Skeleton className="h-4 w-64" />
-                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-4 w-32" />
+                  <div className="flex gap-1.5">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                  </div>
+                  <Skeleton className="h-4 w-20 mt-2" />
+                  <div className="flex gap-1.5">
+                    <Skeleton className="h-5 w-28 rounded-full" />
+                    <Skeleton className="h-5 w-24 rounded-full" />
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-1.5 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Favorite Categories: </span>
-                    <span>
-                      {contentPrefs.data.categories.length > 0
-                        ? contentPrefs.data.categories.join(", ")
-                        : "None yet"}
-                    </span>
+                <div className="space-y-3 text-sm">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Categories</p>
+                    {contentPrefs.data.categories.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {contentPrefs.data.categories.map((c) => (
+                          <Badge key={c} variant="secondary">{c}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">None yet</p>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Favorite Channels: </span>
-                    <span>
-                      {contentPrefs.data.channels.length > 0
-                        ? contentPrefs.data.channels.join(", ")
-                        : "None yet"}
-                    </span>
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Channels</p>
+                    {contentPrefs.data.channels.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {contentPrefs.data.channels.slice(0, 3).map((ch) => (
+                          <Badge key={ch} variant="secondary">{ch}</Badge>
+                        ))}
+                        {contentPrefs.data.channels.length > 3 ? (
+                          <Badge variant="outline">
+                            +{contentPrefs.data.channels.length - 3} more
+                          </Badge>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">None yet</p>
+                    )}
                   </div>
                 </div>
               )}
-              <Button variant="outline" size="sm" onClick={() => setEditPrefsOpen(true)}>
-                Edit Preferences
-              </Button>
             </div>
 
             <Separator />
