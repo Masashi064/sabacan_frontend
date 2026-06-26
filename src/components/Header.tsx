@@ -48,7 +48,10 @@ export function Header() {
     <header className="border-b bg-background">
       <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
         {/* Left */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link
+          href="/"
+          className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
+        >
           <div className="h-9 w-9 rounded-md border flex items-center justify-center">
             <BookOpen className="h-5 w-5" />
           </div>
