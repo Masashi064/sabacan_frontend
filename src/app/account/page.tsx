@@ -35,7 +35,7 @@ type StreakRow = {
 };
 
 type AttemptsDailyFilledRow = {
-  day: string; // YYYY-MM-DD
+  day: string;
   attempts_count: number;
 };
 
@@ -87,7 +87,6 @@ function initialSection<T>(data: T): Section<T> {
 }
 
 function formatDate(yyyy_mm_dd: string) {
-  // show as MM/DD for charts (light & compact)
   const [y, m, d] = yyyy_mm_dd.split("-").map((x) => Number(x));
   if (!y || !m || !d) return yyyy_mm_dd;
   return `${m}/${d}`;
@@ -108,6 +107,36 @@ function secondsToHms(totalSeconds: number) {
   return `${ss}s`;
 }
 
+function SectionHeading({ icon, title }: { icon: string; title: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span aria-hidden="true" className="text-lg">{icon}</span>
+      <h2 className="text-base font-semibold">{title}</h2>
+    </div>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  loading,
+}: {
+  title: string;
+  value: React.ReactNode;
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-1 pt-4 px-4">
+        <CardTitle className="text-xs text-muted-foreground font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 text-2xl font-semibold">
+        {loading ? <Skeleton className="h-8 w-16" /> : value}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
@@ -120,9 +149,9 @@ export default function AccountPage() {
     initialSection(null)
   );
   const [streak, setStreak] = React.useState<Section<StreakRow | null>>(initialSection(null));
-  const [attemptsDaily, setAttemptsDaily] = React.useState<
-    Section<AttemptsDailyFilledRow[]>
-  >(initialSection([]));
+  const [attemptsDaily, setAttemptsDaily] = React.useState<Section<AttemptsDailyFilledRow[]>>(
+    initialSection([])
+  );
   const [attemptsCum, setAttemptsCum] = React.useState<Section<AttemptsCumulativeRow[]>>(
     initialSection([])
   );
@@ -278,7 +307,6 @@ export default function AccountPage() {
     router.replace("/login");
   }
 
-  // Calendar intensity (simple levels)
   function calendarCellClass(events: number) {
     if (events <= 0) return "bg-muted/40";
     if (events === 1) return "bg-emerald-100";
@@ -288,23 +316,16 @@ export default function AccountPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Account</h1>
-          <p className="text-sm text-muted-foreground">
-            Performance, streaks, and vocabulary — all in one place.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={loadAll} disabled={anyLoading}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
+    <main className="mx-auto max-w-2xl px-4 py-8 space-y-10">
+      {/* Page header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Account</h1>
+        <Button variant="ghost" size="sm" onClick={loadAll} disabled={anyLoading}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
+      {/* Errors */}
       {sectionErrors.length > 0 ? (
         <Card>
           <CardContent className="p-4 space-y-1">
@@ -317,228 +338,117 @@ export default function AccountPage() {
         </Card>
       ) : null}
 
-      {/* Profile */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4">
-          {!authChecked ? (
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-56" />
+      {/* ─── 👤 Account ─────────────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading icon="👤" title="Account" />
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            {!authChecked ? (
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={getAvatarUrl(user!) ?? undefined} />
+                  <AvatarFallback>{initials(getDisplayName(user!))}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-medium">{getDisplayName(user!)}</div>
+                  <div className="text-sm text-muted-foreground">{user!.email}</div>
+                </div>
+              </div>
+            )}
+            <Separator />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSignOut}
+              disabled={!authChecked || signingOut}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              {signingOut ? "Signing out…" : "Sign out"}
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ─── 📚 Learning ─────────────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading icon="📚" title="Learning" />
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Total Attempts"
+            loading={perf.loading}
+            value={perf.data?.total_attempts ?? 0}
+          />
+          <StatCard
+            title="Today's Attempts"
+            loading={attemptsDaily.loading}
+            value={getTodayAttempts(attemptsDaily.data)}
+          />
+          <StatCard
+            title="Average Score"
+            loading={perf.loading}
+            value={`${perf.data?.avg_score_percent ?? 0}%`}
+          />
+          <StatCard
+            title="Quiz Time"
+            loading={perf.loading}
+            value={secondsToHms(perf.data?.total_quiz_seconds ?? 0)}
+          />
+        </div>
+
+        {/* Streak */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Streak</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-6 text-sm">
+            <div>
+              <div className="text-muted-foreground text-xs">Current</div>
+              <div className="text-xl font-semibold">
+                {streak.loading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  `${streak.data?.current_streak ?? 0} days`
+                )}
               </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={getAvatarUrl(user!) ?? undefined} />
-                <AvatarFallback>{initials(getDisplayName(user!))}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-medium">{getDisplayName(user!)}</div>
-                <div className="text-sm text-muted-foreground">{user!.email}</div>
+            <div>
+              <div className="text-muted-foreground text-xs">Longest</div>
+              <div className="text-xl font-semibold">
+                {streak.loading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  `${streak.data?.longest_streak ?? 0} days`
+                )}
               </div>
             </div>
-          )}
-
-          <Button variant="outline" onClick={onSignOut} disabled={!authChecked || signingOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            {signingOut ? "Signing out…" : "Sign out"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Content Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Content Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4">
-          {contentPrefs.loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-64" />
-              <Skeleton className="h-4 w-56" />
+            <div>
+              <div className="text-muted-foreground text-xs">Last active</div>
+              <div className="text-xl font-semibold">
+                {streak.loading ? (
+                  <Skeleton className="h-6 w-20" />
+                ) : (
+                  streak.data?.last_active_day ?? "—"
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="space-y-1 text-sm">
-              <p>
-                <span className="font-medium">Favorite Categories: </span>
-                <span className="text-muted-foreground">
-                  {contentPrefs.data.categories.length > 0
-                    ? contentPrefs.data.categories.join(", ")
-                    : "None yet"}
-                </span>
-              </p>
-              <p>
-                <span className="font-medium">Favorite Channels: </span>
-                <span className="text-muted-foreground">
-                  {contentPrefs.data.channels.length > 0
-                    ? contentPrefs.data.channels.join(", ")
-                    : "None yet"}
-                </span>
-              </p>
-            </div>
-          )}
+          </CardContent>
+        </Card>
 
-          <Button variant="outline" onClick={() => setEditPrefsOpen(true)}>
-            Edit Preferences
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Top summary cards */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        {/* Learning Calendar */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Attempts</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {perf.loading ? <Skeleton className="h-8 w-16" /> : perf.data?.total_attempts ?? 0}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Today&apos;s Attempts</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {attemptsDaily.loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              getTodayAttempts(attemptsDaily.data)
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Average Score</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {perf.loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              `${perf.data?.avg_score_percent ?? 0}%`
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Quiz Time (for now)</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">
-            {perf.loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              secondsToHms(perf.data?.total_quiz_seconds ?? 0)
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Streak */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Streak</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-6 text-sm">
-          <div>
-            <div className="text-muted-foreground">Current</div>
-            <div className="text-xl font-semibold">
-              {streak.loading ? (
-                <Skeleton className="h-6 w-12" />
-              ) : (
-                `${streak.data?.current_streak ?? 0} days`
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Longest</div>
-            <div className="text-xl font-semibold">
-              {streak.loading ? (
-                <Skeleton className="h-6 w-12" />
-              ) : (
-                `${streak.data?.longest_streak ?? 0} days`
-              )}
-            </div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Last active</div>
-            <div className="text-xl font-semibold">
-              {streak.loading ? <Skeleton className="h-6 w-20" /> : streak.data?.last_active_day ?? "—"}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Charts */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card className="h-[360px]">
-          <CardHeader>
-            <CardTitle className="text-base">Cumulative Quiz Attempts (Last 30 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">Running total of quiz attempts</p>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            {attemptsCum.loading ? (
-              <Skeleton className="h-full w-full" />
-            ) : (
-              <TrendChart
-                data={attemptsCum.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
-                lines={[{ dataKey: "attempts_cumulative", name: "Cumulative Attempts" }]}
-                emptyMessage="No quiz attempts in the last 30 days yet."
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="h-[360px]">
-          <CardHeader>
-            <CardTitle className="text-base">Daily Quiz Attempts (Last 30 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">Number of quiz attempts per day</p>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            {attemptsDaily.loading ? (
-              <Skeleton className="h-full w-full" />
-            ) : (
-              <TrendChart
-                data={attemptsDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
-                lines={[{ dataKey: "attempts_count", name: "Daily Attempts" }]}
-                emptyMessage="No quiz attempts in the last 30 days yet."
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="h-[360px]">
-          <CardHeader>
-            <CardTitle className="text-base">Score Trend (Last 30 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">Daily average score and accuracy</p>
-          </CardHeader>
-          <CardContent className="h-[260px]">
-            {scoresDaily.loading ? (
-              <Skeleton className="h-full w-full" />
-            ) : (
-              <TrendChart
-                data={scoresDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
-                lines={[
-                  { dataKey: "avg_score_percent", name: "Avg Score" },
-                  { dataKey: "accuracy_percent", name: "Accuracy" },
-                ]}
-                yDomain={[0, 100]}
-                emptyMessage="No quiz scores in the last 30 days yet."
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Calendar + Favorites */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Learning Calendar (Last 90 days)</CardTitle>
-            <p className="text-sm text-muted-foreground">Days with activity are highlighted.</p>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Learning Calendar (Last 90 days)</CardTitle>
+            <p className="text-xs text-muted-foreground">Days with activity are highlighted.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {calendar90.loading ? (
@@ -560,21 +470,99 @@ export default function AccountPage() {
                 ))}
               </div>
             )}
-
-            <Separator />
-
-            <div className="text-xs text-muted-foreground">
-              Tip: streak/calendar grows automatically when you finish a quiz or add favorites.
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Streak grows automatically when you finish a quiz or add favorites.
+            </p>
           </CardContent>
         </Card>
 
+        {/* Charts */}
+        <div className="space-y-3">
+          <Card className="h-[360px]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Cumulative Quiz Attempts (Last 30 days)</CardTitle>
+              <p className="text-xs text-muted-foreground">Running total of quiz attempts</p>
+            </CardHeader>
+            <CardContent className="h-[260px]">
+              {attemptsCum.loading ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <TrendChart
+                  data={attemptsCum.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                  lines={[{ dataKey: "attempts_cumulative", name: "Cumulative Attempts" }]}
+                  emptyMessage="No quiz attempts in the last 30 days yet."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-[360px]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Daily Quiz Attempts (Last 30 days)</CardTitle>
+              <p className="text-xs text-muted-foreground">Number of quiz attempts per day</p>
+            </CardHeader>
+            <CardContent className="h-[260px]">
+              {attemptsDaily.loading ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <TrendChart
+                  data={attemptsDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                  lines={[{ dataKey: "attempts_count", name: "Daily Attempts" }]}
+                  emptyMessage="No quiz attempts in the last 30 days yet."
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="h-[360px]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Score Trend (Last 30 days)</CardTitle>
+              <p className="text-xs text-muted-foreground">Daily average score and accuracy</p>
+            </CardHeader>
+            <CardContent className="h-[260px]">
+              {scoresDaily.loading ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <TrendChart
+                  data={scoresDaily.data.map((r) => ({ ...r, dayLabel: formatDate(r.day) }))}
+                  lines={[
+                    { dataKey: "avg_score_percent", name: "Avg Score" },
+                    { dataKey: "accuracy_percent", name: "Accuracy" },
+                  ]}
+                  yDomain={[0, 100]}
+                  emptyMessage="No quiz scores in the last 30 days yet."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* ─── 🪙 Coins ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading icon="🪙" title="Coins" />
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Favorite Words</CardTitle>
-            <p className="text-sm text-muted-foreground">Latest 12 favorites</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Current Coins</p>
+                <p className="text-2xl font-semibold text-muted-foreground/40">—</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Today&apos;s Earnings</p>
+                <p className="text-2xl font-semibold text-muted-foreground/40">—</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Coin tracking coming soon.</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* ─── ⭐ Favorite Words ────────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading icon="⭐" title="Favorite Words" />
+        <Card>
+          <CardContent className="p-6 space-y-3">
             {recentFav.loading ? (
               <div className="space-y-2">
                 <Skeleton className="h-16 w-full" />
@@ -603,7 +591,6 @@ export default function AccountPage() {
                         </div>
                       ) : null}
                     </div>
-
                     {w.slug ? (
                       <Button asChild variant="outline" size="sm" className="shrink-0">
                         <Link href={`/articles/${w.slug}`}>Open</Link>
@@ -615,12 +602,45 @@ export default function AccountPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </section>
 
-      <div className="text-xs text-muted-foreground">
-        Learning time is currently based on quiz duration only. We can expand it later (sessions,
-        reading time, vocab review, etc.).
-      </div>
+      {/* ─── 🎯 Content Preferences ──────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeading icon="🎯" title="Content Preferences" />
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            {contentPrefs.loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-64" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <div>
+                  <span className="font-medium">Favorite Categories</span>
+                  <p className="text-muted-foreground mt-0.5">
+                    {contentPrefs.data.categories.length > 0
+                      ? contentPrefs.data.categories.join(", ")
+                      : "None yet"}
+                  </p>
+                </div>
+                <div>
+                  <span className="font-medium">Favorite Channels</span>
+                  <p className="text-muted-foreground mt-0.5">
+                    {contentPrefs.data.channels.length > 0
+                      ? contentPrefs.data.channels.join(", ")
+                      : "None yet"}
+                  </p>
+                </div>
+              </div>
+            )}
+            <Separator />
+            <Button variant="outline" size="sm" onClick={() => setEditPrefsOpen(true)}>
+              Edit Preferences
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
 
       <PreferencesDialog
         open={editPrefsOpen}
