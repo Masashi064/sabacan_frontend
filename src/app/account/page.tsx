@@ -664,19 +664,19 @@ export default function AccountPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border p-3 space-y-1">
                 <p className="text-xs text-muted-foreground">Current Coins</p>
-                <p className="text-2xl font-semibold">
-                  {balance ?? <Skeleton className="h-8 w-12 inline-block" />}
-                </p>
+                <div className="text-2xl font-semibold">
+                  {balance ?? <Skeleton className="h-8 w-12" />}
+                </div>
               </div>
               <div className="rounded-lg border p-3 space-y-1">
                 <p className="text-xs text-muted-foreground">Today&apos;s Earnings</p>
-                <p className="text-2xl font-semibold text-emerald-600">
+                <div className="text-2xl font-semibold text-emerald-600">
                   {coins.loading ? (
-                    <Skeleton className="h-8 w-12 inline-block" />
+                    <Skeleton className="h-8 w-12" />
                   ) : (
                     `+${coins.data.todaysEarnings}`
                   )}
-                </p>
+                </div>
               </div>
             </div>
 
