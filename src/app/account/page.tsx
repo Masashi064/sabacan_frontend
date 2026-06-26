@@ -363,7 +363,44 @@ export default function AccountPage() {
                 </div>
               </div>
             )}
+
             <Separator />
+
+            {/* Content Preferences */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">🎯 Content Preferences</p>
+              {contentPrefs.loading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-64" />
+                  <Skeleton className="h-4 w-56" />
+                </div>
+              ) : (
+                <div className="space-y-1.5 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Favorite Categories: </span>
+                    <span>
+                      {contentPrefs.data.categories.length > 0
+                        ? contentPrefs.data.categories.join(", ")
+                        : "None yet"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Favorite Channels: </span>
+                    <span>
+                      {contentPrefs.data.channels.length > 0
+                        ? contentPrefs.data.channels.join(", ")
+                        : "None yet"}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setEditPrefsOpen(true)}>
+                Edit Preferences
+              </Button>
+            </div>
+
+            <Separator />
+
             <Button
               variant="outline"
               size="sm"
@@ -600,44 +637,6 @@ export default function AccountPage() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ─── 🎯 Content Preferences ──────────────────────────── */}
-      <section className="space-y-3">
-        <SectionHeading icon="🎯" title="Content Preferences" />
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            {contentPrefs.loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-64" />
-                <Skeleton className="h-4 w-56" />
-              </div>
-            ) : (
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Favorite Categories</span>
-                  <p className="text-muted-foreground mt-0.5">
-                    {contentPrefs.data.categories.length > 0
-                      ? contentPrefs.data.categories.join(", ")
-                      : "None yet"}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-medium">Favorite Channels</span>
-                  <p className="text-muted-foreground mt-0.5">
-                    {contentPrefs.data.channels.length > 0
-                      ? contentPrefs.data.channels.join(", ")
-                      : "None yet"}
-                  </p>
-                </div>
-              </div>
-            )}
-            <Separator />
-            <Button variant="outline" size="sm" onClick={() => setEditPrefsOpen(true)}>
-              Edit Preferences
-            </Button>
           </CardContent>
         </Card>
       </section>
