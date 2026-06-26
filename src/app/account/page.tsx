@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TrendChart } from "@/components/analytics/TrendChart";
 import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
+import { useCoins } from "@/lib/coins/CoinProvider";
+import { formatCoinReason } from "@/lib/coins/formatReason";
 
 type PerformanceOverviewRow = {
   user_id: string;
@@ -75,6 +77,18 @@ type FavoriteWordRow = {
 type ContentPreferencesRow = {
   categories: string[];
   channels: string[];
+};
+
+type CoinTransaction = {
+  id: number;
+  amount: number;
+  reason: string;
+  created_at: string;
+};
+
+type CoinSectionRow = {
+  todaysEarnings: number;
+  recentActivity: CoinTransaction[];
 };
 
 type Section<T> = {
@@ -141,6 +155,7 @@ function StatCard({
 export default function AccountPage() {
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+  const { balance } = useCoins();
 
   const [authChecked, setAuthChecked] = React.useState(false);
   const [user, setUser] = React.useState<User | null>(null);
@@ -167,6 +182,9 @@ export default function AccountPage() {
   );
   const [contentPrefs, setContentPrefs] = React.useState<Section<ContentPreferencesRow>>(
     initialSection({ categories: [], channels: [] })
+  );
+  const [coins, setCoins] = React.useState<Section<CoinSectionRow>>(
+    initialSection({ todaysEarnings: 0, recentActivity: [] })
   );
   const [editPrefsOpen, setEditPrefsOpen] = React.useState(false);
 
@@ -206,6 +224,7 @@ export default function AccountPage() {
     setCalendar90(initialSection([]));
     setRecentFav(initialSection([]));
     setContentPrefs(initialSection({ categories: [], channels: [] }));
+    setCoins(initialSection({ todaysEarnings: 0, recentActivity: [] }));
 
     const uid = currentUser.id;
 
@@ -274,6 +293,36 @@ export default function AccountPage() {
       .then(({ data, error }) =>
         setRecentFav({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
       );
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    Promise.all([
+      supabase
+        .from("coin_transactions")
+        .select("amount")
+        .eq("user_id", uid)
+        .gte("created_at", startOfToday.toISOString()),
+      supabase
+        .from("coin_transactions")
+        .select("id,amount,reason,created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]).then(([todayRes, recentRes]) => {
+      const todaysEarnings = (todayRes.data ?? []).reduce(
+        (sum: number, row: { amount: number }) => sum + row.amount,
+        0
+      );
+      setCoins({
+        data: {
+          todaysEarnings,
+          recentActivity: (recentRes.data ?? []) as CoinTransaction[],
+        },
+        loading: false,
+        error: todayRes.error?.message ?? recentRes.error?.message ?? null,
+      });
+    });
   }
 
   React.useEffect(() => {
@@ -289,7 +338,8 @@ export default function AccountPage() {
     scoresDaily.loading ||
     calendar90.loading ||
     recentFav.loading ||
-    contentPrefs.loading;
+    contentPrefs.loading ||
+    coins.loading;
 
   const sectionErrors = [
     perf.error,
@@ -300,6 +350,7 @@ export default function AccountPage() {
     calendar90.error,
     recentFav.error,
     contentPrefs.error,
+    coins.error,
   ].filter((e): e is string => Boolean(e));
 
   async function onSignOut() {
@@ -610,17 +661,55 @@ export default function AccountPage() {
         <SectionHeading icon="🪙" title="Coins" />
         <Card>
           <CardContent className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+            {/* Balance + Today */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border p-3 space-y-1">
                 <p className="text-xs text-muted-foreground">Current Coins</p>
-                <p className="text-2xl font-semibold text-muted-foreground/40">—</p>
+                <p className="text-2xl font-semibold">
+                  {balance ?? <Skeleton className="h-8 w-12 inline-block" />}
+                </p>
               </div>
-              <div className="space-y-1">
+              <div className="rounded-lg border p-3 space-y-1">
                 <p className="text-xs text-muted-foreground">Today&apos;s Earnings</p>
-                <p className="text-2xl font-semibold text-muted-foreground/40">—</p>
+                <p className="text-2xl font-semibold text-emerald-600">
+                  {coins.loading ? (
+                    <Skeleton className="h-8 w-12 inline-block" />
+                  ) : (
+                    `+${coins.data.todaysEarnings}`
+                  )}
+                </p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Coin tracking coming soon.</p>
+
+            {/* Recent Activity */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Recent Activity</p>
+              {coins.loading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-5 w-4/5" />
+                </div>
+              ) : coins.data.recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No coins earned yet. Finish a quiz to get started.
+                </p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {coins.data.recentActivity.map((tx) => (
+                    <li
+                      key={tx.id}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
+                      <span className="text-muted-foreground">
+                        {formatCoinReason(tx.reason)}
+                      </span>
+                      <span className="font-medium text-emerald-600">+{tx.amount}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardContent>
         </Card>
       </section>
