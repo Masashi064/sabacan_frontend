@@ -45,14 +45,6 @@ export function ArticleCard({
             <div className="h-44 w-full bg-muted" />
           )}
 
-          {article.isCompleted ? (
-            <Badge
-              variant="secondary"
-              className="absolute top-2 right-2 bg-emerald-50/95 text-emerald-700 border-emerald-200 backdrop-blur-sm shadow-sm"
-            >
-              ✅ Completed
-            </Badge>
-          ) : null}
         </div>
 
         <CardHeader className="space-y-2">
@@ -79,8 +71,9 @@ export function ArticleCard({
           </p>
         </CardHeader>
 
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Open quiz &amp; vocabulary →</span>
+          {article.isCompleted ? <span className="text-base leading-none">✅</span> : null}
         </CardContent>
       </Card>
     </Link>
