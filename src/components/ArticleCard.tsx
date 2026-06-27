@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { Clock, Square } from "lucide-react";
 import { formatVideoLength } from "@/lib/utils";
 
 export type ArticleCardData = {
@@ -73,7 +73,10 @@ export function ArticleCard({
 
         <CardContent className="pt-0 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Open quiz &amp; vocabulary →</span>
-          {article.isCompleted ? <span className="text-base leading-none">✅</span> : null}
+          {article.isCompleted
+            ? <span className="text-base leading-none">✅</span>
+            : <Square className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
+
         </CardContent>
       </Card>
     </Link>
