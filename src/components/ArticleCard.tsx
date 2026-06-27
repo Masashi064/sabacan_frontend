@@ -3,7 +3,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import { formatVideoLength } from "@/lib/utils";
-import { FollowChannelButton } from "@/components/FollowChannelButton";
 
 export type ArticleCardData = {
   slug: string;
@@ -74,15 +73,10 @@ export function ArticleCard({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-1 min-w-0">
-            <p className="text-xs text-muted-foreground truncate min-w-0">
-              {article.channelName ?? "Unknown channel"}
-              {article.publishedDate ? ` • ${article.publishedDate}` : ""}
-            </p>
-            {article.channelName ? (
-              <FollowChannelButton channelName={article.channelName} />
-            ) : null}
-          </div>
+          <p className="text-xs text-muted-foreground truncate min-w-0">
+            {article.channelName ?? "Unknown channel"}
+            {article.publishedDate ? ` • ${article.publishedDate}` : ""}
+          </p>
         </CardHeader>
 
         <CardContent className="pt-0">
