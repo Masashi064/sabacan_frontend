@@ -56,9 +56,8 @@ export function Header() {
           <Image
             src="/logo.png"
             alt="Sabacan365"
-            width={36}
-            height={36}
-            className="rounded-md"
+            width={40}
+            height={40}
           />
           <span className="font-semibold tracking-tight">Sabacan365</span>
         </Link>
