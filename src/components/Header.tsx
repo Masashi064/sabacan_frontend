@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { BookOpen, LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,9 +53,13 @@ export function Header() {
           href="/"
           className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
         >
-          <div className="h-9 w-9 rounded-md border flex items-center justify-center">
-            <BookOpen className="h-5 w-5" />
-          </div>
+          <Image
+            src="/logo.png"
+            alt="Sabacan365"
+            width={36}
+            height={36}
+            className="rounded-md"
+          />
           <span className="font-semibold tracking-tight">Sabacan365</span>
         </Link>
 
