@@ -18,6 +18,8 @@ type CoinResult = {
   awarded: number;
   isFirst: boolean;
   bonus: number;
+  base: number;
+  correctCount: number;
 };
 
 const STUDY_CAP_SECONDS = 45 * 60; // 2700 (safety cap)
@@ -75,7 +77,7 @@ export function QuizSection({
   onProgressChange?: (current: number, total: number) => void;
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
-  const { notifyReward, refreshBalance } = useCoins();
+  const { refreshBalance } = useCoins();
   const { notifyAchievements } = useAchievements();
   const [selected, setSelected] = React.useState<Record<number, string>>({});
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -100,7 +102,6 @@ export function QuizSection({
   const submittedRef = React.useRef(false);
   const coinAwardSubmittedRef = React.useRef(false);
   const achievementCheckedRef = React.useRef(false);
-  const bonusToastSentRef = React.useRef(false);
   const quizCompleteSentRef = React.useRef(false);
   function goTo(idx: number) {
     setCurrentIndex(Math.max(0, Math.min(idx, quiz.length)));
@@ -196,6 +197,8 @@ export function QuizSection({
       awarded: data.awarded,
       isFirst: data.is_first_completion,
       bonus: data.bonus_amount,
+      base: data.base_amount,
+      correctCount: data.correct_count,
     });
     setCoinAwardStatus("awarded");
     void refreshBalance();
@@ -238,18 +241,6 @@ export function QuizSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answeredCount, quiz.length]);
 
-  // Bonus toast, once, when the results screen reveals a perfect first attempt
-  React.useEffect(() => {
-    if (!showResults) return;
-    if (bonusToastSentRef.current) return;
-    if (coinAwardStatus !== "awarded" || !coinResult) return;
-    if (coinResult.isFirst && coinResult.bonus > 0) {
-      bonusToastSentRef.current = true;
-      notifyReward({ amount: coinResult.bonus, label: "+30 Bonus!" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showResults, coinAwardStatus, coinResult]);
-
   function handleChoice(idx: number, choice: string) {
     if (typeof selected[idx] === "string") return; // lock after first pick
 
@@ -259,10 +250,6 @@ export function QuizSection({
     }
 
     setSelected((prev) => ({ ...prev, [idx]: choice }));
-
-    if (choice === quiz[idx]?.answer) {
-      notifyReward({ amount: 10, label: "+10 Coins" });
-    }
   }
 
   function firstUnansweredIndex() {
@@ -292,68 +279,70 @@ export function QuizSection({
           const isLast = idx === quiz.length - 1;
 
           return (
-            <div key={idx} className="space-y-3">
-              <div className="space-y-1">
-                <p className="text-base font-medium">
-                  Q{idx + 1}. {q.question}
-                </p>
+            <div key={idx} className="flex flex-col h-[26rem]">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
+                <div className="space-y-1">
+                  <p className="text-base font-medium">
+                    Q{idx + 1}. {q.question}
+                  </p>
+
+                  {isAnswered ? (
+                    isCorrect ? (
+                      <p className="text-sm font-medium text-emerald-700">Correct ✅</p>
+                    ) : (
+                      <p className="text-sm font-medium text-red-700">Incorrect ❌</p>
+                    )
+                  ) : null}
+                </div>
+
+                <div className="grid gap-2">
+                  {q.choices.map((choice) => {
+                    const chosen = picked === choice;
+                    const correct = q.answer === choice;
+
+                    const base =
+                      "w-full text-left rounded-md border px-3 py-2 text-sm transition-colors";
+                    const state = !isAnswered
+                      ? "hover:bg-muted"
+                      : chosen && correct
+                      ? "border-emerald-500 bg-emerald-50"
+                      : chosen && !correct
+                      ? "border-red-500 bg-red-50"
+                      : correct
+                      ? "border-emerald-300 bg-emerald-50/50"
+                      : "opacity-70";
+
+                    return (
+                      <button
+                        key={choice}
+                        type="button"
+                        className={cn(base, state)}
+                        onClick={() => handleChoice(idx, choice)}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span>{choice}</span>
+                          {isAnswered && correct ? (
+                            <span className="text-emerald-700 font-medium">Answer</span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {isAnswered ? (
-                  isCorrect ? (
-                    <p className="text-sm font-medium text-emerald-700">Correct ✅</p>
-                  ) : (
-                    <p className="text-sm font-medium text-red-700">Incorrect ❌</p>
-                  )
+                  <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                    <p className="text-sm">
+                      <span className="font-medium">Correct answer:</span> {q.answer}
+                    </p>
+                    {q.explanation ? (
+                      <p className="text-sm text-muted-foreground">{q.explanation}</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
 
-              <div className="grid gap-2">
-                {q.choices.map((choice) => {
-                  const chosen = picked === choice;
-                  const correct = q.answer === choice;
-
-                  const base =
-                    "w-full text-left rounded-md border px-3 py-2 text-sm transition-colors";
-                  const state = !isAnswered
-                    ? "hover:bg-muted"
-                    : chosen && correct
-                    ? "border-emerald-500 bg-emerald-50"
-                    : chosen && !correct
-                    ? "border-red-500 bg-red-50"
-                    : correct
-                    ? "border-emerald-300 bg-emerald-50/50"
-                    : "opacity-70";
-
-                  return (
-                    <button
-                      key={choice}
-                      type="button"
-                      className={cn(base, state)}
-                      onClick={() => handleChoice(idx, choice)}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <span>{choice}</span>
-                        {isAnswered && correct ? (
-                          <span className="text-emerald-700 font-medium">Answer</span>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {isAnswered ? (
-                <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Correct answer:</span> {q.answer}
-                  </p>
-                  {q.explanation ? (
-                    <p className="text-sm text-muted-foreground">{q.explanation}</p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="flex items-center justify-between gap-2 pt-1">
+              <div className="flex items-center justify-between gap-2 pt-3 mt-1 border-t shrink-0">
                 <Button variant="outline" onClick={() => goTo(idx - 1)} disabled={idx === 0}>
                   Back
                 </Button>
@@ -390,16 +379,18 @@ export function QuizSection({
           ) : coinAwardStatus === "error" ? (
             <p className="text-sm text-muted-foreground">Coins could not be saved.</p>
           ) : coinAwardStatus === "awarded" && coinResult ? (
-            <>
-              <p className="text-base font-semibold text-emerald-700">
-                +{coinResult.awarded} Coins
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-emerald-700">
+                +{coinResult.awarded} coins acquired!
               </p>
-              {coinResult.isFirst && coinResult.bonus > 0 ? (
-                <p className="text-sm font-medium text-amber-600">
-                  Perfect! +{coinResult.bonus} Bonus!
-                </p>
-              ) : null}
-            </>
+              <ul className="space-y-0.5 text-sm text-muted-foreground">
+                <li>
+                  +{coinResult.base} for {coinResult.correctCount} correct answer
+                  {coinResult.correctCount === 1 ? "" : "s"}
+                </li>
+                {coinResult.bonus > 0 ? <li>+{coinResult.bonus} Perfect score bonus</li> : null}
+              </ul>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">Awarding coins…</p>
           )}

@@ -5,7 +5,6 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
 import { CoinProvider } from "@/lib/coins/CoinProvider";
-import { CoinToastLayer } from "@/components/CoinToastLayer";
 import { AchievementProvider } from "@/lib/achievements/AchievementProvider";
 import { AchievementToastLayer } from "@/components/AchievementToastLayer";
 import { OnboardingGate } from "@/components/preferences/OnboardingGate";
@@ -56,7 +55,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AchievementProvider>
             <Header />
             {children}
-            <CoinToastLayer />
             <AchievementToastLayer />
           </AchievementProvider>
         </CoinProvider>

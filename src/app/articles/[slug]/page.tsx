@@ -211,6 +211,7 @@ export default async function ArticlePage({
           collapsible
           showLabel="Show vocabulary"
           hideLabel="Hide vocabulary"
+          toggleAt="bottom"
           contentOutside
         >
           {vocabItems.length > 0 ? (
