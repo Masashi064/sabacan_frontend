@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { LogOut, User as UserIcon } from "lucide-react";
@@ -53,12 +52,6 @@ export function Header() {
           href="/"
           className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
         >
-          <Image
-            src="/logo.png"
-            alt="Sabacan365"
-            width={40}
-            height={40}
-          />
           <span className="font-semibold tracking-tight">Sabacan365</span>
         </Link>
 

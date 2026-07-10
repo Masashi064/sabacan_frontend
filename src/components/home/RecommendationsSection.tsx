@@ -12,7 +12,6 @@ export function RecommendationsSection({ items }: { items: RecommendedArticle[] 
           key={item.slug}
           article={item}
           href={`/articles/${item.slug}`}
-          reason={item.reason}
         />
       ))}
     </HorizontalScrollShelf>

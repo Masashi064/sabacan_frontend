@@ -33,18 +33,15 @@ export function ArticleCard({
           "active:scale-[0.98] active:duration-75 active:shadow-sm",
         ].join(" ")}
       >
-        <div className="relative">
+        <div className="relative aspect-video w-full bg-muted">
           {article.thumbnailUrl ? (
             <img
               src={article.thumbnailUrl}
               alt={article.videoTitle}
-              className="h-44 w-full object-cover"
+              className="h-full w-full object-cover"
               loading="lazy"
             />
-          ) : (
-            <div className="h-44 w-full bg-muted" />
-          )}
-
+          ) : null}
         </div>
 
         <CardHeader className="space-y-2">

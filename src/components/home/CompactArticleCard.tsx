@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatVideoLength } from "@/lib/utils";
 import type { ArticleCardData } from "@/components/ArticleCard";
@@ -15,11 +14,9 @@ import type { ArticleCardData } from "@/components/ArticleCard";
 export function CompactArticleCard({
   article,
   href,
-  reason,
 }: {
   article: ArticleCardData;
   href: string;
-  reason?: string;
 }) {
   const duration = formatVideoLength(article.videoLength);
 
@@ -33,41 +30,30 @@ export function CompactArticleCard({
           "active:scale-[0.98] active:duration-75 active:shadow-sm",
         ].join(" ")}
       >
-        <div className="relative">
+        <div className="relative aspect-video w-full bg-muted">
           {article.thumbnailUrl ? (
             <img
               src={article.thumbnailUrl}
               alt={article.videoTitle}
-              className="h-20 w-full object-cover"
+              className="h-full w-full object-cover"
               loading="lazy"
             />
-          ) : (
-            <div className="h-20 w-full bg-muted" />
-          )}
-
-          {reason ? (
-            <Badge
-              variant="secondary"
-              className="absolute top-1 left-1 bg-background/90 backdrop-blur-sm shadow-sm text-[9px] px-1 py-0.5 leading-tight"
-            >
-              {reason}
-            </Badge>
           ) : null}
         </div>
 
-        <div className="p-2 space-y-0.5">
+        <div className="p-1.5 space-y-0.5">
           <p className="text-xs font-medium line-clamp-2 min-h-[2rem]">
             {article.videoTitle}
           </p>
-          <p className="text-[11px] text-muted-foreground truncate">
-            {article.channelName ?? "Unknown channel"}
+          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="truncate">{article.channelName ?? "Unknown channel"}</span>
+            {duration ? (
+              <span className="flex items-center gap-0.5 shrink-0">
+                <Clock className="h-3 w-3" />
+                {duration}
+              </span>
+            ) : null}
           </p>
-          {duration ? (
-            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              {duration}
-            </p>
-          ) : null}
         </div>
       </Card>
     </Link>
