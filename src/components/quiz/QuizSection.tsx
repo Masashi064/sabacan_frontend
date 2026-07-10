@@ -285,14 +285,6 @@ export function QuizSection({
                   <p className="text-base font-medium">
                     Q{idx + 1}. {q.question}
                   </p>
-
-                  {isAnswered ? (
-                    isCorrect ? (
-                      <p className="text-sm font-medium text-emerald-700">Correct ✅</p>
-                    ) : (
-                      <p className="text-sm font-medium text-red-700">Incorrect ❌</p>
-                    )
-                  ) : null}
                 </div>
 
                 <div className="grid gap-2">
@@ -329,6 +321,14 @@ export function QuizSection({
                     );
                   })}
                 </div>
+
+                {isAnswered ? (
+                  isCorrect ? (
+                    <p className="text-sm font-medium text-emerald-700">Correct ✅</p>
+                  ) : (
+                    <p className="text-sm font-medium text-red-700">Incorrect ❌</p>
+                  )
+                ) : null}
 
                 {isAnswered ? (
                   <div className="rounded-md border bg-muted/30 p-3 space-y-2">
