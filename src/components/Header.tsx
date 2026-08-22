@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMemo } from "react";
 import { LogOut, User as UserIcon } from "lucide-react";
 
@@ -31,6 +32,7 @@ export function Header() {
           href="/"
           className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
         >
+          <Image src="/logo.png" alt="" width={28} height={28} priority />
           <span className="font-semibold tracking-tight">Sabacan365</span>
         </Link>
 
