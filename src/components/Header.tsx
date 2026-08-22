@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
+import { useMemo } from "react";
 import { LogOut, User as UserIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,33 +15,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { SearchDialog } from "@/components/SearchDialog";
 import { CoinBadge } from "@/components/CoinBadge";
 import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 
 export function Header() {
   const supabase = useMemo(() => supabaseBrowser(), []);
-  const [session, setSession] = useState<Session | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session ?? null);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
-    });
-
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [supabase]);
-
-  const user = session?.user ?? null;
+  const { user } = useAuth();
 
   return (
     <header className="border-b bg-background">

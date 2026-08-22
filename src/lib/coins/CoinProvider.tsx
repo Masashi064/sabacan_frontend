@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 type CoinContextValue = {
   balance: number | null;
@@ -13,11 +14,10 @@ const CoinContext = React.createContext<CoinContextValue | null>(null);
 
 export function CoinProvider({ children }: { children: React.ReactNode }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+  const { user } = useAuth();
   const [balance, setBalance] = React.useState<number | null>(null);
 
   const refreshBalance = React.useCallback(async () => {
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes?.user;
     if (!user) {
       setBalance(null);
       return;
@@ -30,19 +30,11 @@ export function CoinProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
 
     setBalance((data as any)?.balance ?? 0);
-  }, [supabase]);
+  }, [supabase, user]);
 
   React.useEffect(() => {
     void refreshBalance();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      void refreshBalance();
-    });
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  }, [supabase, refreshBalance]);
+  }, [refreshBalance]);
 
   const value = React.useMemo(
     () => ({ balance, refreshBalance }),

@@ -3,16 +3,15 @@
 import * as React from "react";
 
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth/AuthProvider";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 
 export function OnboardingGate() {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+  const { user } = useAuth();
   const [open, setOpen] = React.useState(false);
 
   const checkOnboarding = React.useCallback(async () => {
-    const { data: userRes } = await supabase.auth.getUser();
-    const user = userRes?.user;
-
     if (!user) {
       setOpen(false);
       return;
@@ -27,19 +26,11 @@ export function OnboardingGate() {
     const completed = data?.onboarding_completed ?? false;
     const skipped = data?.onboarding_skipped ?? false;
     setOpen(!completed && !skipped);
-  }, [supabase]);
+  }, [supabase, user]);
 
   React.useEffect(() => {
     void checkOnboarding();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      void checkOnboarding();
-    });
-
-    return () => {
-      sub.subscription.unsubscribe();
-    };
-  }, [supabase, checkOnboarding]);
+  }, [checkOnboarding]);
 
   return <PreferencesDialog open={open} onOpenChange={setOpen} mode="onboarding" />;
 }

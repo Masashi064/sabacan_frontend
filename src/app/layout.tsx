@@ -4,6 +4,7 @@ import Script from "next/script"; // ✅ 追加
 import "./globals.css";
 import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
+import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { CoinProvider } from "@/lib/coins/CoinProvider";
 import { AchievementProvider } from "@/lib/achievements/AchievementProvider";
 import { AchievementToastLayer } from "@/components/AchievementToastLayer";
@@ -51,15 +52,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground">
-        <CoinProvider>
-          <AchievementProvider>
-            <Header />
-            {children}
-            <AchievementToastLayer />
-          </AchievementProvider>
-        </CoinProvider>
+        <AuthProvider>
+          <CoinProvider>
+            <AchievementProvider>
+              <Header />
+              {children}
+              <AchievementToastLayer />
+            </AchievementProvider>
+          </CoinProvider>
 
-        <OnboardingGate />
+          <OnboardingGate />
+        </AuthProvider>
 
         {/* ✅ SPA遷移のPV計測 */}
         <GaPageView />

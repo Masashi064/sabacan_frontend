@@ -1,10 +1,13 @@
 // src/app/page.tsx
+import { Suspense } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ArticleCardData } from "@/components/ArticleCard";
 import { ArticleFilters } from "@/components/ArticleFilters";
 import { MobileFiltersSheet } from "@/components/home/MobileFiltersSheet";
 import { ArticleGrid } from "@/components/home/ArticleGrid";
 import { FilterStatus } from "@/components/home/FilterStatus";
+import { RecommendationsSkeleton, HomeContentSkeleton } from "@/components/home/HomeSkeletons";
 
 import { getHomeData } from "@/lib/home/homeService";
 import { getRecommendedArticles } from "@/lib/home/recommendations";
@@ -19,13 +22,38 @@ export default async function Home({
   searchParams?: Promise<HomeSearchParams>;
 }) {
   const sp = (await searchParams) ?? {};
-
   const supabase = await supabaseServer();
 
-  const [
-    { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError },
-    recommendations,
-  ] = await Promise.all([getHomeData(supabase, sp), getRecommendedArticles(supabase, 20)]);
+  return (
+    <main className="mx-auto max-w-6xl p-6 space-y-6">
+      {/* Streamed independently so a slow recommendations RPC never blocks the article grid. */}
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <Recommendations supabase={supabase} />
+      </Suspense>
+
+      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        <Suspense fallback={<HomeContentSkeleton />}>
+          <HomeContent supabase={supabase} sp={sp} />
+        </Suspense>
+      </div>
+    </main>
+  );
+}
+
+async function Recommendations({ supabase }: { supabase: SupabaseClient }) {
+  const recommendations = await getRecommendedArticles(supabase, 20);
+  return <RecommendationsSection items={recommendations} />;
+}
+
+async function HomeContent({
+  supabase,
+  sp,
+}: {
+  supabase: SupabaseClient;
+  sp: HomeSearchParams;
+}) {
+  const { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError } =
+    await getHomeData(supabase, sp);
 
   const articles: ArticleCardData[] = rows.map((row) => ({
     slug: row.slug,
@@ -40,52 +68,48 @@ export default async function Home({
   }));
 
   return (
-    <main className="mx-auto max-w-6xl p-6 space-y-6">
-      <RecommendationsSection items={recommendations} />
+    <>
+      {/* Desktop: sidebar filters */}
+      <aside className="hidden lg:block lg:sticky lg:top-6 h-fit">
+        <ArticleFilters
+          channelOptions={channelOptions}
+          categoryOptions={categoryOptions}
+          levelOptions={levelOptions}
+        />
+      </aside>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Desktop: sidebar filters */}
-        <aside className="hidden lg:block lg:sticky lg:top-6 h-fit">
-          <ArticleFilters
-            channelOptions={channelOptions}
-            categoryOptions={categoryOptions}
-            levelOptions={levelOptions}
-          />
-        </aside>
+      <div className="space-y-4">
+        {fetchError ? (
+          <section className="rounded-xl border bg-white p-6">
+            <h2 className="text-lg font-semibold">Error</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{fetchError}</p>
+          </section>
+        ) : null}
 
-        <div className="space-y-4">
-          {fetchError ? (
-            <section className="rounded-xl border bg-white p-6">
-              <h2 className="text-lg font-semibold">Error</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{fetchError}</p>
-            </section>
-          ) : null}
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xl font-semibold">🎬 Videos</h2>
 
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold">🎬 Videos</h2>
-
-            {/* Mobile/Tablet: Filters button only (Sheet) */}
-            <div className="lg:hidden">
-              <MobileFiltersSheet
-                channelOptions={channelOptions}
-                categoryOptions={categoryOptions}
-                levelOptions={levelOptions}
-                initialCount={totalCount}
-              />
-            </div>
+          {/* Mobile/Tablet: Filters button only (Sheet) */}
+          <div className="lg:hidden">
+            <MobileFiltersSheet
+              channelOptions={channelOptions}
+              categoryOptions={categoryOptions}
+              levelOptions={levelOptions}
+              initialCount={totalCount}
+            />
           </div>
-
-          <FilterStatus totalCount={totalCount} searchParams={sp} />
-
-          {/* key causes remount (state reset) whenever filter params change */}
-          <ArticleGrid
-            key={JSON.stringify(sp)}
-            initialItems={articles}
-            initialHasMore={hasMore}
-            searchParams={sp}
-          />
         </div>
+
+        <FilterStatus totalCount={totalCount} searchParams={sp} />
+
+        {/* key causes remount (state reset) whenever filter params change */}
+        <ArticleGrid
+          key={JSON.stringify(sp)}
+          initialItems={articles}
+          initialHasMore={hasMore}
+          searchParams={sp}
+        />
       </div>
-    </main>
+    </>
   );
 }
