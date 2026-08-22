@@ -8,6 +8,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.coin_ledger (
+  
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   slug text NOT NULL,
