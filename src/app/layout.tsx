@@ -5,7 +5,6 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
 import { AuthProvider } from "@/lib/auth/AuthProvider";
-import { CoinProvider } from "@/lib/coins/CoinProvider";
 import { AchievementProvider } from "@/lib/achievements/AchievementProvider";
 import { AchievementToastLayer } from "@/components/AchievementToastLayer";
 import { OnboardingGate } from "@/components/preferences/OnboardingGate";
@@ -53,13 +52,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground">
         <AuthProvider>
-          <CoinProvider>
-            <AchievementProvider>
-              <Header />
-              {children}
-              <AchievementToastLayer />
-            </AchievementProvider>
-          </CoinProvider>
+          <AchievementProvider>
+            <Header />
+            {children}
+            <AchievementToastLayer />
+          </AchievementProvider>
 
           <OnboardingGate />
         </AuthProvider>

@@ -4,7 +4,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { gaEvent } from "@/lib/ga";
-import { useCoins } from "@/lib/coins/CoinProvider";
 import { useAchievements } from "@/lib/achievements/AchievementProvider";
 
 export type QuizQuestion = {
@@ -12,14 +11,6 @@ export type QuizQuestion = {
   choices: string[];
   answer: string;
   explanation?: string;
-};
-
-type CoinResult = {
-  awarded: number;
-  isFirst: boolean;
-  bonus: number;
-  base: number;
-  correctCount: number;
 };
 
 const STUDY_CAP_SECONDS = 45 * 60; // 2700 (safety cap)
@@ -77,7 +68,6 @@ export function QuizSection({
   onProgressChange?: (current: number, total: number) => void;
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
-  const { refreshBalance } = useCoins();
   const { notifyAchievements } = useAchievements();
   const [selected, setSelected] = React.useState<Record<number, string>>({});
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -100,7 +90,6 @@ export function QuizSection({
   // fallback: first answer -> finished
   const firstAnswerAtMsRef = React.useRef<number | null>(null);
   const submittedRef = React.useRef(false);
-  const coinAwardSubmittedRef = React.useRef(false);
   const achievementCheckedRef = React.useRef(false);
   const quizCompleteSentRef = React.useRef(false);
   function goTo(idx: number) {
@@ -111,11 +100,6 @@ export function QuizSection({
     "idle" | "saving" | "saved" | "error" | "skipped"
   >("idle");
   const [saveError, setSaveError] = React.useState<string | null>(null);
-
-  const [coinAwardStatus, setCoinAwardStatus] = React.useState<
-    "idle" | "awarding" | "awarded" | "skipped" | "error"
-  >("idle");
-  const [coinResult, setCoinResult] = React.useState<CoinResult | null>(null);
 
   async function saveAttemptOnce() {
     if (submittedRef.current) return;
@@ -170,40 +154,6 @@ export function QuizSection({
     void checkAchievementsOnce();
   }
 
-  async function awardCoinsOnce() {
-    if (coinAwardSubmittedRef.current) return;
-    coinAwardSubmittedRef.current = true;
-
-    const { data: userRes } = await supabase.auth.getUser();
-    if (!userRes?.user) {
-      setCoinAwardStatus("skipped");
-      return;
-    }
-
-    setCoinAwardStatus("awarding");
-
-    const { data, error } = await supabase.rpc("award_quiz_coins", {
-      p_slug: slug,
-      p_correct_count: correctCount,
-      p_total_questions: quiz.length,
-    });
-
-    if (error) {
-      setCoinAwardStatus("error");
-      return;
-    }
-
-    setCoinResult({
-      awarded: data.awarded,
-      isFirst: data.is_first_completion,
-      bonus: data.bonus_amount,
-      base: data.base_amount,
-      correctCount: data.correct_count,
-    });
-    setCoinAwardStatus("awarded");
-    void refreshBalance();
-  }
-
   async function checkAchievementsOnce() {
     if (achievementCheckedRef.current) return;
     achievementCheckedRef.current = true;
@@ -222,7 +172,6 @@ export function QuizSection({
 
     const unlocks = Array.isArray(data) ? data : [];
     if (unlocks.length > 0) {
-      void refreshBalance();
       notifyAchievements(unlocks);
     }
   }
@@ -237,7 +186,6 @@ export function QuizSection({
     }
 
     void saveAttemptOnce();
-    void awardCoinsOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answeredCount, quiz.length]);
 
@@ -355,7 +303,7 @@ export function QuizSection({
         <div className="space-y-3">
           <p className="text-base font-medium">Quiz not finished</p>
           <p className="text-sm text-muted-foreground">
-            Answer all {quiz.length} questions to see your results and earn coins.
+            Answer all {quiz.length} questions to see your results.
           </p>
           <Button
             variant="outline"
@@ -372,28 +320,6 @@ export function QuizSection({
           <p className="text-base font-medium">
             {correctCount} / {quiz.length} Correct!
           </p>
-          {coinAwardStatus === "skipped" ? (
-            <p className="text-sm text-muted-foreground">
-              Login to earn coins for completing quizzes.
-            </p>
-          ) : coinAwardStatus === "error" ? (
-            <p className="text-sm text-muted-foreground">Coins could not be saved.</p>
-          ) : coinAwardStatus === "awarded" && coinResult ? (
-            <div className="space-y-1">
-              <p className="text-lg font-semibold text-emerald-700">
-                +{coinResult.awarded} coins acquired!
-              </p>
-              <ul className="space-y-0.5 text-sm text-muted-foreground">
-                <li>
-                  +{coinResult.base} for {coinResult.correctCount} correct answer
-                  {coinResult.correctCount === 1 ? "" : "s"}
-                </li>
-                {coinResult.bonus > 0 ? <li>+{coinResult.bonus} Perfect score bonus</li> : null}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Awarding coins…</p>
-          )}
         </div>
       )}
     </section>

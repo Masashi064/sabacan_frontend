@@ -22,26 +22,21 @@ export function AchievementToastLayer() {
           </div>
 
           {/* Body */}
-          <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-2xl shrink-0" aria-hidden="true">
-                {t.icon}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-tight">
-                  {t.name}
-                  {t.context ? (
-                    <span className="font-normal text-muted-foreground">: {t.context}</span>
-                  ) : null}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {t.description}
-                </p>
-              </div>
-            </div>
-            <span className="shrink-0 text-sm font-semibold text-amber-600 whitespace-nowrap">
-              +{t.coin_reward} 🪙
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="text-2xl shrink-0" aria-hidden="true">
+              {t.icon}
             </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight">
+                {t.name}
+                {t.context ? (
+                  <span className="font-normal text-muted-foreground">: {t.context}</span>
+                ) : null}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                {t.description}
+              </p>
+            </div>
           </div>
         </div>
       ))}

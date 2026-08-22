@@ -18,10 +18,10 @@ const AuthContext = React.createContext<AuthContextValue>({
 });
 
 // Single shared session read + onAuthStateChange subscription for the whole
-// app shell. Header/CoinProvider/OnboardingGate all need to know "who is the
-// current user" on every page load — without this they each ran their own
-// getSession()/getUser() call and subscription, tripling the auth work done
-// on every app open.
+// app shell. Header/OnboardingGate both need to know "who is the current
+// user" on every page load — without this they each ran their own
+// getSession()/getUser() call and subscription, duplicating the auth work
+// done on every app open.
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
   const [session, setSession] = React.useState<Session | null>(null);

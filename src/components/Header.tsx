@@ -17,7 +17,6 @@ import {
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { SearchDialog } from "@/components/SearchDialog";
-import { CoinBadge } from "@/components/CoinBadge";
 import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 
 export function Header() {
@@ -38,7 +37,6 @@ export function Header() {
         {/* Right */}
         <div className="flex items-center gap-2">
           <SearchDialog />
-          <CoinBadge hasSession={!!user} />
           {!user ? (
             <Button asChild>
               <Link href="/login">Login</Link>
