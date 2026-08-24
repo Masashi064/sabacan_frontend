@@ -2,12 +2,11 @@ import StudyStartMarker from "@/components/learning/StudyStartMarker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { QuizCard } from "@/components/quiz/QuizCard";
 import type { QuizQuestion } from "@/components/quiz/QuizSection";
-import { VocabularySection, type VocabItem } from "@/components/vocab/VocabularySection";
+import type { VocabItem } from "@/components/vocab/VocabularySection";
 import { ReportIssueButton } from "@/components/article/ReportIssueButton";
 import { LearningSection } from "@/components/article/LearningSection";
-import { CopyButton } from "@/components/article/CopyButton";
+import { LearningTabs } from "@/components/article/LearningTabs";
 import { formatVideoLength } from "@/lib/utils";
 import {
   parseTranscriptJsonToParagraphs,
@@ -194,82 +193,29 @@ export default async function ArticlePage({
         )}
       </div>
 
-      <div className="space-y-4">
-        {/* Quiz */}
-        <QuizCard quiz={quizList} slug={slug} videoId={c.video_id ?? null} />
+      {/* Quiz / Vocabulary / Transcript: one unified learning container,
+          switched via tabs, so all three are visible without scrolling. */}
+      <LearningTabs
+        quiz={quizList}
+        slug={slug}
+        videoId={c.video_id ?? null}
+        vocabItems={vocabItems}
+        transcriptParagraphs={transcriptParagraphs}
+      />
 
-        {/* Vocabulary */}
-        <LearningSection
-          icon="🧩"
-          title="Vocabulary"
-          meta={
-            vocabItems.length > 0
-              ? `${vocabItems.length} word${vocabItems.length === 1 ? "" : "s"} to learn`
-              : undefined
-          }
-          description={vocabItems.length > 0 ? "Tap cards to flip and save favorites." : undefined}
-          collapsible
-          showLabel="Show vocabulary"
-          hideLabel="Hide vocabulary"
-          toggleAt="bottom"
-          contentOutside
-        >
-          {vocabItems.length > 0 ? (
-            <VocabularySection items={vocabItems} slug={slug} videoId={c.video_id ?? null} />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Vocabulary data is not available yet for this article.
-            </p>
-          )}
-        </LearningSection>
-      </div>
-
-      {/* Quiz/Vocabulary above are the main learning content; Transcript
-          and Found a problem below are secondary/optional tools. */}
       <Separator />
 
-      <div className="space-y-4">
-        {/* Transcript */}
-        <LearningSection
-          icon="💬"
-          title="Transcript"
-          description="Read along with the video."
-          collapsible
-          showLabel="Show transcript"
-          hideLabel="Hide transcript"
-          titleRight={
-            transcriptParagraphs.length > 0 ? (
-              <CopyButton text={transcriptParagraphs.join("\n\n")} />
-            ) : undefined
-          }
-        >
-          {transcriptParagraphs.length > 0 ? (
-            <div className="space-y-3">
-              {transcriptParagraphs.map((p, i) => (
-                <p key={i} className="text-sm leading-relaxed text-muted-foreground">
-                  {p}
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Transcript is not available yet for this article.
-            </p>
-          )}
-        </LearningSection>
-
-        {/* Found a problem? */}
-        <LearningSection
-          icon="⚠️"
-          title="Found a problem?"
-          description="Help us improve this article."
-          collapsible
-          showLabel="Report an issue"
-          hideLabel="Close"
-        >
-          <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
-        </LearningSection>
-      </div>
+      {/* Found a problem? stays separate from the learning tabs. */}
+      <LearningSection
+        icon="⚠️"
+        title="Found a problem?"
+        description="Help us improve this article."
+        collapsible
+        showLabel="Report an issue"
+        hideLabel="Close"
+      >
+        <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
+      </LearningSection>
     </main>
   );
 }
