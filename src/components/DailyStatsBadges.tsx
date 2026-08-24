@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CalendarCheck, Flame } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Flame } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -53,6 +53,8 @@ export function DailyStatsBadges() {
 
   if (!user) return null;
 
+  const completedToday = (todayCount ?? 0) > 0;
+
   return (
     <div className="flex items-center gap-1.5">
       <Badge
@@ -60,7 +62,11 @@ export function DailyStatsBadges() {
         className="px-2 py-1 text-xs font-medium gap-1"
         title="Quizzes completed today"
       >
-        <CalendarCheck className="h-3.5 w-3.5" />
+        {completedToday ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+        ) : (
+          <CalendarCheck className="h-3.5 w-3.5" />
+        )}
         {todayCount ?? "…"}
       </Badge>
       <Badge
@@ -68,7 +74,11 @@ export function DailyStatsBadges() {
         className="px-2 py-1 text-xs font-medium gap-1"
         title="Current streak"
       >
-        <Flame className="h-3.5 w-3.5 text-orange-500" />
+        {completedToday ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-orange-500" />
+        ) : (
+          <Flame className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
         {streak ?? "…"}
       </Badge>
     </div>
