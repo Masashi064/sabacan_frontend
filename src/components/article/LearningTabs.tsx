@@ -54,7 +54,11 @@ export function LearningTabs({
         </CardHeader>
 
         <CardContent className="px-4 py-4 sm:px-6">
-          <TabsContent value="quiz">
+          {/* forceMount + manual hiding (instead of letting Radix unmount
+              inactive panels) keeps QuizSection mounted the whole time, so
+              switching tabs mid-quiz can't wipe its answered/current-index
+              state and silently reset progress. */}
+          <TabsContent value="quiz" forceMount className={tab === "quiz" ? undefined : "hidden"}>
             {quiz.length > 0 ? (
               <QuizSection
                 quiz={quiz}
@@ -69,7 +73,11 @@ export function LearningTabs({
             )}
           </TabsContent>
 
-          <TabsContent value="vocabulary">
+          <TabsContent
+            value="vocabulary"
+            forceMount
+            className={tab === "vocabulary" ? undefined : "hidden"}
+          >
             {vocabItems.length > 0 ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
@@ -85,7 +93,11 @@ export function LearningTabs({
             )}
           </TabsContent>
 
-          <TabsContent value="transcript">
+          <TabsContent
+            value="transcript"
+            forceMount
+            className={tab === "transcript" ? undefined : "hidden"}
+          >
             {transcriptParagraphs.length > 0 ? (
               <div className="space-y-3">
                 {transcriptParagraphs.map((p, i) => (

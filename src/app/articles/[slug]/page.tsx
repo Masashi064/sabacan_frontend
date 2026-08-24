@@ -1,12 +1,10 @@
 import StudyStartMarker from "@/components/learning/StudyStartMarker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import type { QuizQuestion } from "@/components/quiz/QuizSection";
 import type { VocabItem } from "@/components/vocab/VocabularySection";
-import { ReportIssueButton } from "@/components/article/ReportIssueButton";
-import { LearningSection } from "@/components/article/LearningSection";
 import { LearningTabs } from "@/components/article/LearningTabs";
+import { ReportIssueSection } from "@/components/article/ReportIssueSection";
 import { formatVideoLength } from "@/lib/utils";
 import {
   parseTranscriptJsonToParagraphs,
@@ -203,19 +201,9 @@ export default async function ArticlePage({
         transcriptParagraphs={transcriptParagraphs}
       />
 
-      <Separator />
-
-      {/* Found a problem? stays separate from the learning tabs. */}
-      <LearningSection
-        icon="⚠️"
-        title="Found a problem?"
-        description="Help us improve this article."
-        collapsible
-        showLabel="Report an issue"
-        hideLabel="Close"
-      >
-        <ReportIssueButton slug={slug} videoId={c.video_id ?? null} />
-      </LearningSection>
+      {/* Found a problem?: a low-emphasis secondary action, not part of
+          the main learning flow — stays separate from the learning tabs. */}
+      <ReportIssueSection slug={slug} videoId={c.video_id ?? null} />
     </main>
   );
 }

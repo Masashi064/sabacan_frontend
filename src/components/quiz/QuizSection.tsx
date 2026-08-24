@@ -294,6 +294,11 @@ export function QuizSection({
                 <Button variant="outline" onClick={() => goTo(idx - 1)} disabled={idx === 0}>
                   Back
                 </Button>
+                {answeredCount === quiz.length ? (
+                  <Button variant="ghost" onClick={() => goTo(quiz.length)}>
+                    Back to results
+                  </Button>
+                ) : null}
                 <Button onClick={() => goTo(idx + 1)}>{isLast ? "See results" : "Next"}</Button>
               </div>
             </div>
@@ -316,10 +321,35 @@ export function QuizSection({
           </Button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="text-base font-medium">
             {correctCount} / {quiz.length} Correct!
           </p>
+
+          <div className="space-y-1.5">
+            <p className="text-sm text-muted-foreground">Tap a question to review it:</p>
+            <div className="flex flex-wrap gap-2">
+              {quiz.map((qq, i) => {
+                const isCorrect = selected[i] === qq.answer;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => goTo(i)}
+                    title={`Review question ${i + 1}`}
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded-md border text-sm font-medium transition-colors",
+                      isCorrect
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        : "border-red-500 bg-red-50 text-red-700 hover:bg-red-100"
+                    )}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </section>
