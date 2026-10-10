@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { CalendarCheck, CheckCircle2, Flame } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -58,28 +59,34 @@ export function DailyStatsBadges() {
   return (
     <div className="flex items-center gap-1.5">
       <Badge
+        asChild
         variant="secondary"
         className="px-2 py-1 text-xs font-medium gap-1"
         title="Quizzes completed today"
       >
-        {completedToday ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-        ) : (
-          <CalendarCheck className="h-3.5 w-3.5" />
-        )}
-        {todayCount ?? "…"}
+        <Link href="/account" aria-label="今日の取り組みを確認">
+          {completedToday ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+          ) : (
+            <CalendarCheck className="h-3.5 w-3.5" />
+          )}
+          {todayCount ?? "…"}
+        </Link>
       </Badge>
       <Badge
+        asChild
         variant="secondary"
         className="px-2 py-1 text-xs font-medium gap-1"
         title="Current streak"
       >
-        {completedToday ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-orange-500" />
-        ) : (
-          <Flame className="h-3.5 w-3.5 text-muted-foreground" />
-        )}
-        {streak ?? "…"}
+        <Link href="/account" aria-label="連続日数記録を確認">
+          {completedToday ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-orange-500" />
+          ) : (
+            <Flame className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+          {streak ?? "…"}
+        </Link>
       </Badge>
     </div>
   );

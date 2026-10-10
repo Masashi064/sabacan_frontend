@@ -6,7 +6,6 @@ import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { AchievementProvider } from "@/lib/achievements/AchievementProvider";
-import { AchievementToastLayer } from "@/components/AchievementToastLayer";
 import { OnboardingGate } from "@/components/preferences/OnboardingGate";
 
 const geistSans = Geist({
@@ -55,7 +54,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AchievementProvider>
             <Header />
             {children}
-            <AchievementToastLayer />
           </AchievementProvider>
 
           <OnboardingGate />
