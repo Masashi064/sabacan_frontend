@@ -161,7 +161,7 @@ export default async function ArticlePage({
     .join(" • ");
 
   return (
-    <main className="mx-auto max-w-4xl p-6 space-y-6">
+    <main className="mx-auto max-w-4xl p-6 space-y-6 lg:max-w-[1440px]">
       {/* ✅ ここで「記事ページに入った瞬間に計測開始」 */}
       <StudyStartMarker slug={slug} />
 
@@ -174,32 +174,33 @@ export default async function ArticlePage({
         {metaLine ? <p className="text-xs text-muted-foreground">{metaLine}</p> : null}
       </header>
 
-      {/* YouTube */}
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
-        {c.video_id ? (
-          <iframe
-            className="h-full w-full"
-            src={`https://www.youtube.com/embed/${c.video_id}`}
-            title={c.video_title ?? "YouTube video"}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
-            video_id is missing
-          </div>
-        )}
-      </div>
+      <div className="article-learning-layout">
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted">
+          {c.video_id ? (
+            <iframe
+              className="h-full w-full"
+              src={`https://www.youtube.com/embed/${c.video_id}`}
+              title={c.video_title ?? "YouTube video"}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+              video_id is missing
+            </div>
+          )}
+        </div>
 
-      {/* Quiz / Vocabulary / Transcript: one unified learning container,
-          switched via tabs, so all three are visible without scrolling. */}
-      <LearningTabs
-        quiz={quizList}
-        slug={slug}
-        videoId={c.video_id ?? null}
-        vocabItems={vocabItems}
-        transcriptParagraphs={transcriptParagraphs}
-      />
+        <div className="article-learning-panel">
+          <LearningTabs
+            quiz={quizList}
+            slug={slug}
+            videoId={c.video_id ?? null}
+            vocabItems={vocabItems}
+            transcriptParagraphs={transcriptParagraphs}
+          />
+        </div>
+      </div>
 
       {/* Found a problem?: a low-emphasis secondary action, not part of
           the main learning flow — stays separate from the learning tabs. */}

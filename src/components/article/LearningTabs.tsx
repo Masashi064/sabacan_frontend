@@ -32,7 +32,7 @@ export function LearningTabs({
   );
 
   return (
-    <Card className="gap-0 py-0">
+    <Card className="learning-card gap-0 py-0">
       <Tabs value={tab} onValueChange={setTab} className="gap-0">
         <CardHeader className="border-b px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
@@ -58,7 +58,7 @@ export function LearningTabs({
               inactive panels) keeps QuizSection mounted the whole time, so
               switching tabs mid-quiz can't wipe its answered/current-index
               state and silently reset progress. */}
-          <TabsContent value="quiz" forceMount className={tab === "quiz" ? undefined : "hidden"}>
+          <TabsContent value="quiz" forceMount className={tab === "quiz" ? "learning-quiz-panel" : "learning-quiz-panel hidden"}>
             {quiz.length > 0 ? (
               <QuizSection
                 quiz={quiz}

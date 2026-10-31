@@ -94,12 +94,14 @@ function mount(userId = 'alice') {
     return output.props.value;
   }
   render();
+  const rewards = [];
+  render().subscribeToRewards((reward) => rewards.push(reward));
   const cleanups = effects.map((effect) => effect());
   function respond(count, streak, error = null, offset = requests.length - 2) {
     requests[offset].resolve({ data: [{ day: '2026-10-31', attempts_count: count }], error });
     requests[offset + 1].resolve({ data: { current_streak: streak, longest_streak: streak }, error });
   }
-  return { render, requests, respond, events, timers, broadcasts,
+  return { render, requests, respond, events, timers, broadcasts, rewards, visibility: target,
     unmount: () => cleanups.forEach((cleanup) => cleanup?.()) };
 }
 
@@ -236,8 +238,10 @@ test('actual quiz persistence notifies only after successful insert; failed save
       'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
       '@/components/ui/button': { Button: 'button' },
       '@/lib/supabase/client': { supabaseBrowser: () => supabase },
-      '@/lib/learning/LearningStatsProvider': { useLearningStats: () => ({ notifySaved: (uid) => {
+      '@/lib/learning/LearningStatsProvider': { useLearningStats: () => ({ notifySaved: (uid, eventId) => {
         assert.equal(committed, true);
+        assert.equal(typeof eventId, "string");
+        assert.ok(eventId.startsWith("test:"));
         notifications.push(uid);
       } }) },
       '@/lib/ga': { gaEvent: () => {} },
@@ -248,4 +252,137 @@ test('actual quiz persistence notifies only after successful insert; failed save
     await tick();
     assert.deepEqual(notifications, fail ? [] : ['alice']);
   }
+});
+
+test('local quiz success rewards only increased fields, exactly once per completion', async () => {
+  const app = mount();
+  app.respond(1, 4);
+  await tick();
+  assert.equal(app.rewards.length, 0);
+  app.render().notifySaved('alice', 'quiz-1');
+  assert.equal(app.rewards.length, 0); // Wait for confirmed data, never delay that data for animation.
+  app.respond(2, 4);
+  await tick();
+  assert.equal(app.render().todayCount, 2);
+  assert.equal(app.rewards.length, 1);
+  assert.equal(app.rewards[0].id, 'quiz-1');
+  assert.equal(app.rewards[0].attempts, true);
+  assert.equal(app.rewards[0].streak, false);
+  const reads = app.requests.length;
+  app.render().notifySaved('alice', 'quiz-1');
+  assert.equal(app.requests.length, reads);
+  assert.equal(app.rewards.length, 1);
+  app.render().notifySaved('alice', 'quiz-2');
+  app.respond(3, 5);
+  await tick();
+  assert.equal(app.rewards.length, 2);
+  assert.equal(app.rewards[1].attempts, true);
+  assert.equal(app.rewards[1].streak, true);
+  app.unmount();
+});
+
+test('initial load, refetch, favorites, cross-tab changes and re-login never reward', async () => {
+  const app = mount();
+  app.respond(1, 1);
+  await tick();
+  let done = app.render().refresh();
+  app.respond(2, 2);
+  await done;
+  app.render().notifySaved('alice');
+  app.respond(3, 3);
+  await tick();
+  app.broadcasts[0].onmessage({ data: 'alice' });
+  app.respond(4, 4);
+  await tick();
+  assert.equal(app.render().todayCount, 4);
+  assert.equal(app.rewards.length, 0);
+  app.unmount();
+  const login = mount();
+  login.respond(4, 4);
+  await tick();
+  assert.equal(login.rewards.length, 0);
+  login.unmount();
+});
+
+test('unchanged, reduced, reset or unavailable stats do not earn a reward', async () => {
+  const app = mount();
+  app.render().notifySaved('alice', 'initially-unknown');
+  app.respond(1, 1, null, 0);
+  await tick();
+  app.respond(1, 1);
+  await tick();
+  assert.equal(app.rewards.length, 0);
+  for (const [event, count, streak] of [['unchanged', 1, 1], ['reduced', 0, 0], ['reset', 0, 0]]) {
+    app.render().notifySaved('alice', event);
+    app.respond(count, streak);
+    await tick();
+    assert.equal(app.rewards.length, 0);
+  }
+  app.unmount();
+});
+
+test('failed fetch consumes reward so a later ordinary refetch cannot replay it', async () => {
+  const app = mount();
+  app.respond(1, 1);
+  await tick();
+  app.render().notifySaved('alice', 'quiz-read-failed');
+  app.respond(0, 0, { message: 'unavailable' });
+  await tick();
+  assert.equal(app.rewards.length, 0);
+  const done = app.render().refresh();
+  app.respond(2, 2);
+  await done;
+  assert.equal(app.rewards.length, 0);
+  assert.equal(app.render().todayCount, 2);
+  app.unmount();
+});
+
+test('save concurrent with an older request rewards once after the fresh response', async () => {
+  const app = mount();
+  app.respond(1, 1);
+  await tick();
+  void app.render().refresh();
+  app.render().notifySaved('alice', 'quiz-in-flight');
+  app.respond(1, 1);
+  await tick();
+  assert.equal(app.rewards.length, 0);
+  app.respond(2, 2);
+  await tick();
+  assert.equal(app.rewards.length, 1);
+  assert.equal(app.rewards[0].attempts, true);
+  app.unmount();
+});
+
+test('a cross-tab update cancels ambiguous local reward attribution', async () => {
+  const app = mount();
+  app.respond(1, 1);
+  await tick();
+  app.render().notifySaved('alice', 'local-quiz');
+  app.broadcasts[0].onmessage({ data: 'alice' });
+  app.respond(2, 2);
+  await tick();
+  app.respond(3, 3);
+  await tick();
+  assert.equal(app.render().todayCount, 3);
+  assert.equal(app.rewards.length, 0);
+  app.unmount();
+});
+
+
+test('a completion resolved in a hidden tab is not replayed on return', async () => {
+  const app = mount();
+  app.respond(1, 1);
+  await tick();
+  app.visibility.visibilityState = 'hidden';
+  app.render().notifySaved('alice', 'hidden-completion');
+  app.respond(2, 2);
+  await tick();
+  assert.equal(app.render().todayCount, 2);
+  assert.equal(app.rewards.length, 0);
+  app.visibility.visibilityState = 'visible';
+  app.events.get('visibilitychange')();
+  app.respond(2, 2);
+  await tick();
+  assert.equal(app.rewards.length, 0);
+  app.unmount();
 });

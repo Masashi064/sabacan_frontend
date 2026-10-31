@@ -151,7 +151,7 @@ export function QuizSection({
     }
 
     setSaveStatus("saved");
-    notifySaved(userRes.user.id);
+    notifySaved(userRes.user.id, `${slug}:${completedAt.toISOString()}:${fallbackStartedMs}`);
 
     // Check achievements after quiz_attempt is persisted
     void checkAchievementsOnce();
@@ -213,7 +213,7 @@ export function QuizSection({
   if (quiz.length === 0) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="learning-quiz space-y-4">
       {!showResults && saveStatus === "error" ? (
         <p className="text-xs text-red-600" title={saveError ?? undefined}>
           Save failed{saveError ? `: ${saveError}` : ""}
@@ -230,7 +230,7 @@ export function QuizSection({
           const isLast = idx === quiz.length - 1;
 
           return (
-            <div key={idx} className="flex flex-col h-[26rem]">
+            <div key={idx} className="learning-quiz-question flex flex-col h-[26rem]">
               <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
                 <div className="space-y-1">
                   <p className="text-base font-medium">
@@ -308,7 +308,7 @@ export function QuizSection({
           );
         })()
       ) : answeredCount < quiz.length ? (
-        <div className="space-y-3">
+        <div className="learning-quiz-results space-y-3">
           <p className="text-base font-medium">Quiz not finished</p>
           <p className="text-sm text-muted-foreground">
             Answer all {quiz.length} questions to see your results.
@@ -324,7 +324,7 @@ export function QuizSection({
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="learning-quiz-results space-y-3">
           <p className="text-base font-medium">
             {correctCount} / {quiz.length} Correct!
           </p>

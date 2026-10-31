@@ -288,8 +288,8 @@ export function VocabularySection({
     <div className="space-y-3">
       {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
 
-      {/* モバイルは必ず1列、タブレット以上（sm+）で2列 */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+      {/* モバイルとPCのサイドパネルは1列、縦並びのタブレットでは2列 */}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1">
         {items.map((it) => (
           <VocabFlipCard
             key={it.word}

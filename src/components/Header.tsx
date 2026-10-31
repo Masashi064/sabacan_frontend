@@ -27,18 +27,18 @@ export function Header() {
 
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto max-w-6xl px-6 h-14 flex items-center justify-between">
+      <div className="mx-auto max-w-6xl px-6 max-[480px]:px-3 max-[360px]:px-2 h-14 flex items-center justify-between">
         {/* Left */}
         <Link
           href="/"
-          className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
+          className="flex items-center gap-2 max-[480px]:gap-1 rounded-md transition-opacity hover:opacity-75 active:opacity-50"
         >
-          <Image src="/logo.png" alt="" width={28} height={28} priority />
-          <span className="font-semibold tracking-tight">Sabacan365</span>
+          <Image className="max-[480px]:size-6 max-[360px]:size-5" src="/logo.png" alt="" width={28} height={28} priority />
+          <span className="font-semibold tracking-tight max-[480px]:text-sm">Sabacan365</span>
         </Link>
 
         {/* Right */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-[480px]:gap-1">
           <SearchDialog />
           <DailyStatsBadges />
           {!user ? (
@@ -50,7 +50,7 @@ export function Header() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-10 px-2 flex items-center gap-2"
+                  className="h-10 px-2 max-[360px]:px-1 flex items-center gap-2"
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={getAvatarUrl(user) ?? undefined} />
