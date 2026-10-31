@@ -220,6 +220,15 @@
   margin-block-start: 1.5rem;
 }
 
+/* Allow 1440px of learning content plus the existing 24px side padding.
+   Scope this to the article page; mobile keeps its original container. */
+@media (min-width: 768px) {
+  .article-study-page {
+    width: 100%;
+    max-width: 1488px;
+  }
+}
+
 /* The player determines the row height. Only the desktop panel is bounded;
    narrower screens keep the original stacked, document-scrolling layout. */
 @media (min-width: 1024px) {

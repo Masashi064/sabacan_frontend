@@ -153,6 +153,7 @@ export default async function ArticlePage({
 
   const metaLine = [
     c.channel_name ?? "Unknown channel",
+    c.published_date ? `Published: ${c.published_date}` : null,
     formatVideoLength(c.video_length),
     c.assigned_level,
     c.assigned_category,
@@ -161,7 +162,7 @@ export default async function ArticlePage({
     .join(" • ");
 
   return (
-    <main className="mx-auto max-w-4xl p-6 space-y-6 lg:max-w-[1440px]">
+    <main className="article-study-page mx-auto max-w-4xl p-6 space-y-6">
       {/* ✅ ここで「記事ページに入った瞬間に計測開始」 */}
       <StudyStartMarker slug={slug} />
 
