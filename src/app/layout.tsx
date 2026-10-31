@@ -4,6 +4,7 @@ import Script from "next/script"; // ✅ 追加
 import "./globals.css";
 import { Header } from "@/components/Header";
 import GaPageView from "@/components/analytics/GaPageView"; // ✅ 追加
+import { LearningStatsProvider } from "@/lib/learning/LearningStatsProvider";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import { AchievementProvider } from "@/lib/achievements/AchievementProvider";
 import { OnboardingGate } from "@/components/preferences/OnboardingGate";
@@ -51,10 +52,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground">
         <AuthProvider>
-          <AchievementProvider>
-            <Header />
-            {children}
-          </AchievementProvider>
+          <LearningStatsProvider>
+            <AchievementProvider>
+              <Header />
+              {children}
+            </AchievementProvider>
+          </LearningStatsProvider>
 
           <OnboardingGate />
         </AuthProvider>

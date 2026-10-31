@@ -17,6 +17,8 @@ import { TrendChart } from "@/components/analytics/TrendChart";
 import { getDisplayName, getAvatarUrl, initials } from "@/lib/auth/userDisplay";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 
+import { useLearningStats } from "@/lib/learning/LearningStatsProvider";
+
 type PerformanceOverviewRow = {
   user_id: string;
   total_attempts: number;
@@ -26,18 +28,6 @@ type PerformanceOverviewRow = {
   avg_score_percent: number;
   total_quiz_seconds: number;
   last_quiz_completed_at: string | null;
-};
-
-type StreakRow = {
-  user_id: string | null;
-  last_active_day: string | null;
-  current_streak: number;
-  longest_streak: number;
-};
-
-type AttemptsDailyFilledRow = {
-  day: string;
-  attempts_count: number;
 };
 
 type AttemptsCumulativeRow = {
@@ -93,11 +83,6 @@ function formatDate(yyyy_mm_dd: string) {
   return `${m}/${d}`;
 }
 
-function getTodayAttempts(data: AttemptsDailyFilledRow[]) {
-  if (data.length === 0) return 0;
-  return data[data.length - 1]?.attempts_count ?? 0;
-}
-
 function secondsToHms(totalSeconds: number) {
   const s = Math.max(0, totalSeconds | 0);
   const h = Math.floor(s / 3600);
@@ -149,10 +134,7 @@ export default function AccountPage() {
   const [perf, setPerf] = React.useState<Section<PerformanceOverviewRow | null>>(
     initialSection(null)
   );
-  const [streak, setStreak] = React.useState<Section<StreakRow | null>>(initialSection(null));
-  const [attemptsDaily, setAttemptsDaily] = React.useState<Section<AttemptsDailyFilledRow[]>>(
-    initialSection([])
-  );
+  const { streak, attemptsDaily, todayCount, currentStreak, refresh: refreshLearningStats } = useLearningStats();
   const [attemptsCum, setAttemptsCum] = React.useState<Section<AttemptsCumulativeRow[]>>(
     initialSection([])
   );
@@ -199,8 +181,6 @@ export default function AccountPage() {
     setAuthChecked(true);
 
     setPerf(initialSection(null));
-    setStreak(initialSection(null));
-    setAttemptsDaily(initialSection([]));
     setAttemptsCum(initialSection([]));
     setScoresDaily(initialSection([]));
     setCalendar90(initialSection([]));
@@ -218,24 +198,6 @@ export default function AccountPage() {
       .maybeSingle()
       .then(({ data, error }) =>
         setPerf({ data: (data as any) ?? null, loading: false, error: error?.message ?? null })
-      );
-
-    supabase
-      .from("v_account_learning_streaks")
-      .select("*")
-      .eq("user_id", uid)
-      .maybeSingle()
-      .then(({ data, error }) =>
-        setStreak({ data: (data as any) ?? null, loading: false, error: error?.message ?? null })
-      );
-
-    supabase
-      .from("v_account_quiz_attempts_daily_30_filled")
-      .select("day,attempts_count")
-      .eq("user_id", uid)
-      .order("day", { ascending: true })
-      .then(({ data, error }) =>
-        setAttemptsDaily({ data: (data as any) ?? [], loading: false, error: error?.message ?? null })
       );
 
     supabase
@@ -321,7 +283,7 @@ export default function AccountPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Account</h1>
-        <Button variant="ghost" size="sm" onClick={loadAll} disabled={anyLoading}>
+        <Button variant="ghost" size="sm" onClick={() => { void loadAll(); void refreshLearningStats(); }} disabled={anyLoading}>
           <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
@@ -457,7 +419,7 @@ export default function AccountPage() {
           <StatCard
             title="Today's Attempts"
             loading={attemptsDaily.loading}
-            value={getTodayAttempts(attemptsDaily.data)}
+            value={todayCount ?? "—"}
           />
           <StatCard
             title="Average Score"
@@ -483,7 +445,7 @@ export default function AccountPage() {
                 {streak.loading ? (
                   <Skeleton className="h-6 w-12" />
                 ) : (
-                  `${streak.data?.current_streak ?? 0} days`
+                  currentStreak === null ? "—" : `${currentStreak} days`
                 )}
               </div>
             </div>
@@ -493,7 +455,7 @@ export default function AccountPage() {
                 {streak.loading ? (
                   <Skeleton className="h-6 w-12" />
                 ) : (
-                  `${streak.data?.longest_streak ?? 0} days`
+                  streak.error ? "—" : `${streak.data?.longest_streak ?? 0} days`
                 )}
               </div>
             </div>

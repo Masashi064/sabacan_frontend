@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useLearningStats } from "@/lib/learning/LearningStatsProvider";
 import { gaEvent } from "@/lib/ga";
 import { useAchievements } from "@/lib/achievements/AchievementProvider";
 
@@ -68,6 +69,7 @@ export function QuizSection({
   onProgressChange?: (current: number, total: number) => void;
 }) {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+  const { notifySaved } = useLearningStats();
   const { notifyAchievements } = useAchievements();
   const [selected, setSelected] = React.useState<Record<number, string>>({});
   const [currentIndex, setCurrentIndex] = React.useState(0);
@@ -149,6 +151,7 @@ export function QuizSection({
     }
 
     setSaveStatus("saved");
+    notifySaved(userRes.user.id);
 
     // Check achievements after quiz_attempt is persisted
     void checkAchievementsOnce();

@@ -1,5 +1,7 @@
 "use client";
 
+import { useLearningStats } from "@/lib/learning/LearningStatsProvider";
+
 import * as React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -159,6 +161,7 @@ export function VocabularySection({
   slug: string;
   videoId: string | null;
 }) {
+  const { notifySaved } = useLearningStats();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
 
   const [localFav, setLocalFav] = React.useState<Set<string>>(new Set());
@@ -254,6 +257,8 @@ export function VocabularySection({
           return next;
         });
         setNote(`Failed to save favorite: ${error.message}`);
+      } else {
+        notifySaved(user.id);
       }
     } else {
       // 削除
@@ -271,6 +276,8 @@ export function VocabularySection({
           return next;
         });
         setNote(`Failed to remove favorite: ${error.message}`);
+      } else {
+        notifySaved(user.id);
       }
     }
 
