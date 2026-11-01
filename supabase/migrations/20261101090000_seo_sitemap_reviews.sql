@@ -24,22 +24,40 @@ create index article_seo_reviews_approved_slug
   where status = 'approved' and public_access_confirmed and quality_approved
     and rights_approved and reviewed_at is not null;
 alter table public.article_seo_reviews enable row level security;
-revoke all on public.article_seo_reviews from anon, authenticated;
--- No browser writes. Approval is performed by an authorized DB operator.
+revoke all on public.article_seo_reviews from public, anon, authenticated;
 grant all on public.article_seo_reviews to service_role;
+
+-- A dedicated function owner can read approved review projections and the same
+-- content as anon, but cannot log in, bypass RLS, write reviews, or create objects.
+-- Do not grant this role to anon/authenticated (membership is one-way).
+create role sabacan_sitemap_reader nologin inherit nobypassrls;
+grant anon to sabacan_sitemap_reader;
+grant usage on schema public to sabacan_sitemap_reader;
 grant select (slug, status, public_access_confirmed, quality_approved,
   rights_approved, reviewed_at, content_updated_at)
-  on public.article_seo_reviews to anon, authenticated;
-create policy sitemap_approved_read on public.article_seo_reviews
-  for select to anon, authenticated
+  on public.article_seo_reviews to sabacan_sitemap_reader;
+create policy sitemap_function_read on public.article_seo_reviews
+  for select to sabacan_sitemap_reader
   using (status = 'approved' and public_access_confirmed and quality_approved
     and rights_approved and reviewed_at is not null);
 
--- SECURITY INVOKER preserves RLS on categories, quiz, and vocab. No service-role
--- client or per-user session is used by the sitemap route.
+-- Temporarily allow assigning ownership to the non-login reader role. Remove
+-- both grants immediately after ownership transfer in this same transaction.
+grant sabacan_sitemap_reader to current_user;
+grant create on schema public to sabacan_sitemap_reader;
+
+-- SECURITY DEFINER reads the private review projection using a restricted,
+-- non-bypass owner. Content-table RLS still applies through inherited anon.
 create function public.get_sitemap_articles(p_after_slug text default null, p_limit integer default 1000)
 returns table (slug text, last_modified timestamptz)
-language sql stable security invoker set search_path = '' as $$
+language sql stable security definer
+set search_path = ''
+-- A logged-in RPC caller must not broaden this public projection via auth.uid().
+-- Function SET values are restored automatically on exit.
+set "request.jwt.claims" = '{"role":"anon"}'
+set "request.jwt.claim.sub" = ''
+set "request.jwt.claim.role" = 'anon'
+as $$
   select r.slug, r.content_updated_at
   from public.article_seo_reviews r
   join public.categories c on c.slug = r.slug
@@ -66,5 +84,23 @@ language sql stable security invoker set search_path = '' as $$
   order by r.slug collate "C"
   limit least(greatest(p_limit, 1), 1000);
 $$;
-revoke all on function public.get_sitemap_articles(text, integer) from public;
+alter function public.get_sitemap_articles(text, integer) owner to sabacan_sitemap_reader;
+revoke create on schema public from sabacan_sitemap_reader;
+revoke sabacan_sitemap_reader from current_user;
+revoke all on function public.get_sitemap_articles(text, integer) from public, anon, authenticated;
 grant execute on function public.get_sitemap_articles(text, integer) to anon, authenticated;
+
+-- Fail safely if inherited/default privileges differ from the expected model.
+-- Run the migration atomically (CLI transaction or explicit SQL Editor BEGIN).
+do $$
+begin
+  if pg_catalog.has_schema_privilege('sabacan_sitemap_reader', 'public', 'CREATE')
+    or pg_catalog.pg_has_role('anon', 'sabacan_sitemap_reader', 'USAGE')
+    or pg_catalog.pg_has_role('authenticated', 'sabacan_sitemap_reader', 'USAGE')
+    or pg_catalog.has_column_privilege('anon', 'public.article_seo_reviews', 'status', 'SELECT')
+    or pg_catalog.has_column_privilege('authenticated', 'public.article_seo_reviews', 'status', 'SELECT')
+  then
+    raise exception 'Unexpected inherited privileges; stop and review before deploying the sitemap.';
+  end if;
+end;
+$$;
