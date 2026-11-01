@@ -107,7 +107,7 @@ test('chat prevents duplicate requests, retains turns, retries without duplicate
   assert.equal(app.requests[1].body.history.length,2);
   app.requests[1].resolve(Response.json({error:'Try again'},{status:502})); await new Promise(setImmediate);
   tree=app.render(); assert.ok(app.nodes(tree,'div').some(n=>n.props.role==='alert'));
-  app.nodes(tree,'button').find(n=>n.props.children==='再試行 / Retry').props.onClick();
+  app.nodes(tree,'button').find(n=>n.props.children==='Retry').props.onClick();
   assert.equal(app.requests[2].body.question,'Another example?'); assert.equal(app.requests[2].body.history.length,2);
   app.requests[2].resolve(Response.json({answer:'He got away with it.'})); await new Promise(setImmediate);
   assert.equal(app.nodes(app.render(),'p').filter(n=>n.props.children==='Another example?').length,1);

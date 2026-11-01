@@ -33,26 +33,26 @@ async function readBody(req: Request) {
 
 export async function POST(req: Request) {
   const origin = req.headers.get("origin");
-  if (origin && origin !== new URL(req.url).origin) return error("許可されていないリクエストです。", 403);
+  if (origin && origin !== new URL(req.url).origin) return error("This request is not allowed.", 403);
   try {
     const supabase = await supabaseServer();
     const { data, error: authError } = await supabase.auth.getUser();
-    if (authError || !data.user) return error("ログインしてから質問してください。", 401);
+    if (authError || !data.user) return error("Please sign in before asking a question.", 401);
     let body;
-    try { body = await readBody(req); } catch { return error("質問や会話履歴の形式・長さを確認してください。", 400); }
-    if (!process.env.OPENAI_API_KEY) return error("Ask AIは現在利用できません。しばらくしてから再試行してください。", 503);
+    try { body = await readBody(req); } catch { return error("Please check the format and length of your question and conversation history.", 400); }
+    if (!process.env.OPENAI_API_KEY) return error("Ask AI is currently unavailable. Please try again later.", 503);
     // Atomic, shared across Vercel instances; fail closed if migration is absent.
     const { data: allowed, error: limitError } = await supabase.rpc("consume_ask_ai_request");
-    if (limitError) return error("Ask AIは現在利用できません。しばらくしてから再試行してください。", 503);
-    if (allowed !== true) return error("利用回数の上限です。少し時間をおいて再試行してください（1分10回・1日100回）。", 429, { "Retry-After": "60" });
+    if (limitError) return error("Ask AI is currently unavailable. Please try again later.", 503);
+    if (allowed !== true) return error("You have reached the usage limit (10 requests per minute and 100 per day). Please try again later.", 429, { "Retry-After": "60" });
 
     let context: unknown = { available: false };
     if (body.videoId) {
       const { data: video, error: videoError } = await supabase.from("categories")
         .select("video_id,slug,video_title,channel_name,assigned_category,assigned_level")
         .eq("video_id", body.videoId).limit(1).maybeSingle();
-      if (videoError) return error("動画情報を取得できませんでした。再試行してください。", 503);
-      if (!video) return error("動画が見つからないか、アクセスできません。", 404);
+      if (videoError) return error("Could not load the video information. Please try again.", 503);
+      if (!video) return error("This video could not be found or is not accessible.", 404);
       let transcript: string | null = null;
       // Explicit opt-in: displaying a caption does not imply permission to send it to AI.
       if (process.env.ASK_AI_INCLUDE_TRANSCRIPT === "true") {
@@ -75,11 +75,11 @@ export async function POST(req: Request) {
       store: false,
       ...( (!process.env.OPENAI_MODEL || process.env.OPENAI_MODEL === "gpt-5.6-luna") ? { reasoning: { effort: "none" as const } } : {}),
     }, { signal: req.signal });
-    if (response.status !== "completed" || !response.output_text?.trim()) return error("回答を完了できませんでした。質問を短くして再試行してください。", 502);
+    if (response.status !== "completed" || !response.output_text?.trim()) return error("Could not complete the answer. Please shorten your question and try again.", 502);
     return NextResponse.json({ answer: response.output_text.trim().slice(0, MESSAGE_LIMIT) }, { headers: { "Cache-Control": "no-store" } });
   } catch (cause) {
-    if (cause instanceof OpenAI.APIConnectionTimeoutError) return error("回答がタイムアウトしました。再試行してください。", 504);
-    if (cause instanceof OpenAI.APIError && cause.status === 429) return error("AIが混み合っています。少し待って再試行してください。", 429, { "Retry-After": "30" });
-    return error("回答を取得できませんでした。しばらくしてから再試行してください。", 502);
+    if (cause instanceof OpenAI.APIConnectionTimeoutError) return error("The answer timed out. Please try again.", 504);
+    if (cause instanceof OpenAI.APIError && cause.status === 429) return error("Ask AI is busy. Please wait a moment and try again.", 429, { "Retry-After": "30" });
+    return error("Could not get an answer. Please try again later.", 502);
   }
 }
