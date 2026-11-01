@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
+import { selectTranscriptContext } from "@/lib/ask-ai/transcriptContext";
 import { ASK_AI_INSTRUCTIONS } from "@/lib/ask-ai/prompt";
 import { validateRequest, MESSAGE_LIMIT } from "@/lib/ask-ai/shared";
 import { parseTranscriptJsonToParagraphs, parseVttToParagraphs } from "@/lib/transcript/parseVtt";
@@ -52,18 +53,17 @@ export async function POST(req: Request) {
         .eq("video_id", body.videoId).limit(1).maybeSingle();
       if (videoError) return error("Could not load the video information. Please try again.", 503);
       if (!video) return error("This video could not be found or is not accessible.", 404);
-      let transcript: string | null = null;
-      // Explicit opt-in: displaying a caption does not imply permission to send it to AI.
-      if (process.env.ASK_AI_INCLUDE_TRANSCRIPT === "true") {
-        const { data: captions } = await supabase.from("captions").select("vtt_text,transcript_json")
-          .eq("video_id", video.video_id).eq("slug", video.slug).limit(1).maybeSingle();
-        if (captions) {
-          const paragraphs = captions.vtt_text ? parseVttToParagraphs(captions.vtt_text) : parseTranscriptJsonToParagraphs(captions.transcript_json);
-          transcript = paragraphs.join("\n").slice(0, 6000) || null;
-        }
+      // Fetch trusted server-side captions independently of the Transcript tab.
+      const { data: captions, error: captionsError } = await supabase.from("captions").select("vtt_text,transcript_json")
+        .eq("video_id", video.video_id).eq("slug", video.slug).limit(1).maybeSingle();
+      let paragraphs: string[] = [];
+      if (!captionsError && captions) {
+        paragraphs = captions.vtt_text ? parseVttToParagraphs(captions.vtt_text) : [];
+        if (paragraphs.length === 0) paragraphs = parseTranscriptJsonToParagraphs(captions.transcript_json);
       }
+      const transcriptContext = selectTranscriptContext(paragraphs, body.question, body.history);
       const clip = (value: unknown) => typeof value === "string" ? value.slice(0, 300) : null;
-      context = { title: clip(video.video_title), channel: clip(video.channel_name), category: clip(video.assigned_category), difficulty: clip(video.assigned_level), transcriptExcerpt: transcript, transcriptMayBePartial: true };
+      context = { title: clip(video.video_title), channel: clip(video.channel_name), category: clip(video.assigned_category), difficulty: clip(video.assigned_level), ...transcriptContext, transcriptStatus: captionsError ? "unavailable" : transcriptContext.transcriptExcerpt ? "available" : "missing" };
     }
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30000, maxRetries: 0 });
     const response = await client.responses.create({

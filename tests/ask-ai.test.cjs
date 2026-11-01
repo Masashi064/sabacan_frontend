@@ -14,6 +14,7 @@ function compile(file, imports, globals = {}) {
   return exports;
 }
 const shared = compile('src/lib/ask-ai/shared.ts', {});
+const transcriptContext = compile('src/lib/ask-ai/transcriptContext.ts', {});
 const valid = { videoId: 'abcdefghijk', question: '意味は？', history: [] };
 test('validation rejects forged system/transcript, oversized and malformed histories', () => {
   assert.equal(shared.validateRequest(valid).question, '意味は？');
@@ -43,14 +44,15 @@ function api(overrides = {}) {
   const db = {
     auth: { getUser: async () => ({data:{user: overrides.guest ? null : {id:'alice'}}}) },
     rpc: async () => ({data: overrides.allowed ?? true,error: overrides.limitError}),
-    from: table => { const query = { select: () => query, eq: (key,value) => {queries.push([table,key,value]);return query;}, limit:()=>query, maybeSingle:async () => table === 'categories' ? {data:overrides.noVideo ? null : {video_id:valid.videoId,slug:'lesson',video_title:'Verified title'},error:overrides.videoError} : {data:{vtt_text:null,transcript_json:['Approved caption']}} }; return query; },
+    from: table => { const query = { select: () => query, eq: (key,value) => {queries.push([table,key,value]);return query;}, limit:()=>query, maybeSingle:async () => table === 'categories' ? {data:overrides.noVideo ? null : {video_id:valid.videoId,slug:'lesson',video_title:'Verified title'},error:overrides.videoError} : {data:overrides.noCaptions ? null : {vtt_text:overrides.vtt ?? null,transcript_json:overrides.captionText ?? ['Approved caption'.repeat(1000)]},error:overrides.captionsError} }; return query; },
   };
   const route = compile('src/app/api/ask-ai/route.ts', {
     openai: {default:OpenAI}, 'next/server':{NextResponse:{json:(body,init)=>Response.json(body,init)}},
     '@/lib/supabase/server':{supabaseServer:async()=>db}, '@/lib/ask-ai/shared':shared,
     '@/lib/ask-ai/prompt':compile('src/lib/ask-ai/prompt.ts', {}),
-    '@/lib/transcript/parseVtt':{parseVttToParagraphs:()=>['caption'],parseTranscriptJsonToParagraphs:()=>['Approved caption'.repeat(1000)]},
-  }, {Buffer, URL, process:{env:{OPENAI_API_KEY:overrides.noKey?undefined:'test-secret',ASK_AI_INCLUDE_TRANSCRIPT:overrides.transcript?'true':undefined}}, });
+    '@/lib/ask-ai/transcriptContext':transcriptContext,
+    '@/lib/transcript/parseVtt':compile('src/lib/transcript/parseVtt.ts', {}),
+  }, {Buffer, URL, process:{env:{OPENAI_API_KEY:overrides.noKey?undefined:'test-secret'}}, });
   return { calls, queries, post: (body=valid, options={})=>route.POST(new Request('https://example.test/api/ask-ai',{method:'POST',headers:{'Content-Type':'application/json',...options.headers},body:typeof body === 'string'?body:JSON.stringify(body)})) };
 }
 test('API enforces authentication, origin, validation, config and shared rate limits', async () => {
@@ -66,17 +68,17 @@ test('API enforces authentication, origin, validation, config and shared rate li
   assert.equal((await api({noVideo:true}).post()).status,404);
   assert.equal((await api({videoError:{}}).post()).status,503);
 });
-test('API passes server-verified video, opt-in bounded captions, conversation and fixed instructions', async () => {
-  const a = api({transcript:true});
+test('API passes server-verified video, automatic bounded captions, conversation and fixed instructions', async () => {
+  const a = api();
   const history=[{role:'user',content:'What does get away with mean?'},{role:'assistant',content:'Avoid punishment.'}];
   assert.equal((await a.post({...valid,history,question:'Another example?'})).status,200);
   const payload = a.calls[1];
   assert.equal(payload.model,'gpt-5.6-luna'); assert.equal(payload.store,false); assert.equal(payload.max_output_tokens,1200);
   const context=JSON.parse(payload.input[0].content.split('not a question): ')[1]);
-  assert.equal(context.title,'Verified title'); assert.equal(context.transcriptExcerpt.length,6000);
+  assert.equal(context.title,'Verified title'); assert.ok(context.transcriptExcerpt.length <= 6000); assert.equal(context.transcriptMayBePartial,true); assert.equal(context.transcriptStatus,'available');
   assert.equal(payload.input[1].content,history[0].content); assert.equal(payload.input.at(-1).content,'Another example?');
   assert.match(payload.instructions,/Japanese for Japanese/); assert.match(payload.instructions,/English for English/); assert.match(payload.instructions,/untrusted/);
-  const b=api(); await b.post(); assert.equal(b.queries.some(q=>q[0]==='captions'),false);
+  const b=api(); await b.post(); assert.equal(b.queries.some(q=>q[0]==='captions'),true); assert.ok(b.queries.some(q=>q[0]==='captions'&&q[1]==='video_id'&&q[2]===valid.videoId)); assert.ok(b.queries.some(q=>q[0]==='captions'&&q[1]==='slug'&&q[2]==='lesson'));
   const c=api(); await c.post({...valid,videoId:null}); assert.equal(c.queries.length,0);
 });
 test('upstream timeout, throttling, empty and incomplete replies yield safe errors', async () => {
@@ -124,4 +126,35 @@ test('Enter submits, Shift+Enter and Japanese IME composition do not',()=>{
   key({key:'Enter',shiftKey:false,nativeEvent:{isComposing:false},preventDefault(){}});
   assert.equal(app.requests.length,1);
   app.requests[0].resolve(Response.json({answer:'説明'}));
+});
+
+
+test('short transcripts are complete; long transcripts retrieve later expressions and follow-ups within budget', () => {
+  const short=transcriptContext.selectTranscriptContext(['A short transcript.'], 'Explain', []);
+  assert.equal(short.transcriptExcerpt,'A short transcript.'); assert.equal(short.transcriptMayBePartial,false);
+  const source='Introduction. '+ 'ordinary words '.repeat(1000) + 'The phrase break the ice means help people feel relaxed. ' + 'ordinary words '.repeat(1000);
+  for(const [question,history] of [['What does break the ice mean?',[]],['Another example?',[{role:'user',content:'What does break the ice mean?'},{role:'assistant',content:'Help people relax.'}]]]) {
+    const result=transcriptContext.selectTranscriptContext([source],question,history);
+    assert.ok(result.transcriptExcerpt.includes('break the ice'));
+    assert.ok(result.transcriptExcerpt.length<=6000); assert.equal(result.transcriptMayBePartial,true);
+    assert.equal(result.transcriptCharacters,source.trim().length);
+  }
+  const sampled=transcriptContext.selectTranscriptContext([source+' FINAL REMARK'], 'Summarize this video',[]);
+  assert.match(sampled.transcriptExcerpt,/FINAL REMARK/);
+  assert.equal(transcriptContext.selectTranscriptContext([], 'What is an idiom?',[]).transcriptExcerpt,null);
+});
+
+test('missing or unavailable captions allow general questions; empty VTT falls back to JSON', async () => {
+  for(const options of [{noCaptions:true},{captionsError:{}},{captionText:[]}]) {
+    const a=api(options); assert.equal((await a.post()).status,200);
+    const context=JSON.parse(a.calls[1].input[0].content.split('not a question): ')[1]);
+    assert.equal(context.transcriptExcerpt,null);
+    assert.equal(context.transcriptStatus,options.captionsError?'unavailable':'missing');
+  }
+  for(const vtt of ['WEBVTT\n','WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nActual video phrase.']) {
+    const a=api({vtt,captionText:['JSON fallback phrase.']});await a.post();
+    const context=JSON.parse(a.calls[1].input[0].content.split('not a question): ')[1]);
+    assert.equal(context.transcriptExcerpt,vtt.includes('Actual')?'Actual video phrase.':'JSON fallback phrase.');
+    assert.equal(context.transcriptMayBePartial,false);
+  }
 });
