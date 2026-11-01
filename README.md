@@ -45,15 +45,13 @@ No videos are seeded or approved automatically. With a successful empty review
 query, the XML contains the homepage only (zero videos). A missing migration or
 DB failure raises an error, never a successful empty/partial sitemap.
 
-An authorized database operator must verify public access, learning quality, and
-rights for the currently published material, then record evidence and a review
-time before setting `status = 'approved'`, `public_access_confirmed = true`,
-`quality_approved = true`, and `rights_approved = true`. Do not approve content
-merely because captions exist. Target 20–50 videos only when that many have been
-reviewed. `pending` and `excluded` rows are not sitemap entries and do not change
-an article's robots metadata or access permissions. Re-review after content or
-rights change; publishing/import tools must revoke stale approvals as part of
-that workflow. Automated content-change invalidation is not included here.
+An authorized operator must record explicit public/reuse rights evidence covering
+all published learning material, including captions. Automatic eligibility now
+uses `rights_approved`, `reviewed_at`, and a content fingerprint; it does not
+require a separate manual listing/public/quality approval. `status = 'excluded'`
+always prevents listing. Neither pending nor sitemap omission changes article
+robots metadata or access permissions. No permission is inferred from YouTube
+availability, channel names, caption presence, or page quality.
 
 Review evidence is private: anonymous/authenticated users can read public
 URL information only through the RPC, cannot read review states/evidence, and
@@ -169,3 +167,77 @@ The HTTP checks inspect server HTML, three disjoint 24-video windows, bot parity
 sequential hrefs, Canonicals, and filtered noindex variants. Browser checks must
 add JavaScript-disabled navigation, responsive layout, infinite scroll from a
 non-first page, and existing learning-tab interactions.
+
+## Automatic SEO operation
+
+`20261101120000_seo_automatic_eligibility.sql` is an SEO-only follow-up. Apply it
+alone inside BEGIN/COMMIT after checking backups, then record only its own ID;
+never use normal db push or repair old migration history. It adds a private
+rights fingerprint column/trigger and restricted helpers, and updates only SEO
+RPCs/policy. It does not add content-table triggers, change content RLS/Auth, or
+seed approvals. Physical restore remains the emergency recovery option; PITR is
+disabled. For app rollback, retain SEO objects/evidence; the old URL-only RPC is
+preserved. Never replay either SQL file over existing objects.
+
+Routine flow (no Cron, Google API calls, or external service):
+
+1. New public videos are automatically reachable through SSR pages/normal links.
+2. Rights-unknown videos are held out of XML, without new article noindex tags.
+3. An operator/authorized importer records an actual rights verification once:
+
+```sql
+-- Replace placeholders only AFTER checking evidence for the current material.
+insert into public.article_seo_reviews
+  (slug, rights_approved, reviewed_at, review_evidence)
+values ('REVIEWED_SLUG', true, now(), 'ACTUAL_PERMISSION_REFERENCE_AND_SCOPE')
+on conflict (slug) do update set rights_approved = true,
+  reviewed_at = excluded.reviewed_at, review_evidence = excluded.review_evidence;
+```
+
+This is not a recommendation to approve unknown videos. The importer may write
+this record only from a verified permission/licence source; no channel-name
+allowlist or blanket approval exists. An intentionally excluded row stays
+excluded until an operator explicitly removes that exclusion. The trigger binds
+rights evidence to the exact video/title, Quiz, latest Vocabulary, and captions.
+Any change invalidates that snapshot without changing learning content. Recheck
+rights and update evidence/review time to accept changed material. Existing
+legacy reviews without snapshots need re-verification, never automatic backfill.
+
+4. The SQL checks public RLS visibility, valid slug/video ID/title, unique source
+video, nonduplicated Quiz rows, and usable Quiz/latest Vocabulary. The generator
+then checks actual anonymous HTTP 200, exact Canonical and absence of noindex;
+only eligible pages enter XML. A valid video ID is a syntactic YouTube URL check,
+not a guarantee that YouTube will continue playing it in every country.
+5. Deletion/RLS unpublishing, explicit exclusion, revoked rights, changed material,
+or failed quality removes eligibility. The one-hour sitemap cache is unchanged.
+Transient DB/network/429/5xx failures fail refresh and retain last good XML; cold
+failures are errors, not successful empty XML. Cached entries can remain until
+successful refresh; use access control for urgent content removal.
+
+Page checks use four concurrent reads, per-page/content-fingerprint cache (one
+hour), six-second requests and a two-MB response cap. Generation has a 25-second
+budget. Large simultaneous permission imports can require repeated refreshes to
+warm per-page checks; an incomplete pass is never published. Keep initial rights
+activation in reviewed batches rather than unbounded cold-cache activation.
+The SQL/report safety bound is 50,000 catalog rows; split/extend this before the
+catalog reaches that size. The existing XML ceiling remains 49,999 videos.
+
+`pnpm seo:report` uses existing linked Supabase CLI authentication and the private
+read-only `supabase/seo_report.sql`. It reports counts by reason, never evidence,
+user data or credentials. `rights_unverified`, `rights_content_changed`,
+`rights_snapshot_missing`, `missing_or_invalid_learning_content`, `duplicate_video`, and
+explicit exclusions are distinguishable. Reasons are first-failure categories,
+not independent counts. Deleted videos with retained reviews are reported too.
+DB `eligible` counts are candidates; the Vercel `[seo-sitemap]` structured log
+reports actual included count and HTTP/Canonical/noindex exclusions. The report
+is available on demand, not a daily manual SEO task and not a public admin API.
+
+`pnpm seo:audit:crawl` performs an optional read-only full crawl of every public
+page and compares it with the anonymous catalog, including final-page links,
+unique slugs, Canonicals and robots tags. A stable catalog during the audit is
+required (ordinary offset pagination does not freeze concurrent imports).
+
+The existing submitted `https://sabacan365.com/sitemap.xml` URL is retained and
+advertised by robots.txt. Do not resubmit it or request indexing for every new
+video. Search Console monitoring is optional; discovery/indexing is Google's
+decision, not guaranteed by this automation.

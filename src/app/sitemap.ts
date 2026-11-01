@@ -6,7 +6,7 @@ import { loadSitemap } from "@/lib/seo/sitemap";
 // enter this shared data cache; no cookies or authenticated data are read.
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
-const getCachedSitemap = unstable_cache(loadSitemap, ["approved-article-sitemap-v1"], { revalidate: 3600 });
+const getCachedSitemap = unstable_cache(loadSitemap, ["automatic-article-sitemap-v2"], { revalidate: 3600 });
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return getCachedSitemap();

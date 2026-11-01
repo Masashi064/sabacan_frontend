@@ -15,7 +15,10 @@
     "test:sitemap:sql": "node tests/sitemap-sql.test.cjs",
     "test:sitemap:http": "node tests/sitemap-http.test.cjs",
     "test:pagination": "node tests/pagination.test.cjs",
-    "test:pagination:http": "node tests/pagination-http.test.cjs"
+    "test:pagination:http": "node tests/pagination-http.test.cjs",
+    "seo:report": "node scripts/seo-report.cjs",
+    "test:seo:auto": "node tests/seo-automatic.test.cjs",
+    "seo:audit:crawl": "node scripts/seo-crawl-audit.cjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
