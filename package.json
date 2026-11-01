@@ -18,7 +18,9 @@
     "test:pagination:http": "node tests/pagination-http.test.cjs",
     "seo:report": "node scripts/seo-report.cjs",
     "test:seo:auto": "node tests/seo-automatic.test.cjs",
-    "seo:audit:crawl": "node scripts/seo-crawl-audit.cjs"
+    "seo:audit:crawl": "node scripts/seo-crawl-audit.cjs",
+    "test:seo:public": "node tests/seo-public-default.test.cjs",
+    "seo:audit:pages": "node scripts/seo-audit-pages.cjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",

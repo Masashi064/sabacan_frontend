@@ -1,34 +1,45 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@supabase/supabase-js";
-import { verifyPublicPage } from "./verify-page";
 import { SITE_URL, articleCanonicalUrl } from "./urls";
 
 const PAGE_SIZE = 1000;
 // Reserve one URL for the homepage. Split sitemaps before exceeding this limit.
 const MAX_ARTICLES = 49999;
-type SitemapRow = { slug: string; last_modified: string | null; content_hash: string };
+type SitemapBatch = { articles: unknown; has_more: unknown; next_after_slug: unknown };
+type SitemapRow = { slug: string; last_modified: string | null };
 
 export async function loadSitemap(): Promise<MetadataRoute.Sitemap> {
   try {
-    const deadline = Date.now() + 25000;
+    const deadline = Date.now() + 50000;
     // Anonymous public data only: never attach cookies, user history, or a service key.
     const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store", signal: AbortSignal.timeout(Math.max(1, Math.min(10000, deadline - Date.now()))) }) },
     });
+    // Explicit boundary avoids coupling PostgREST generic inference to the loop cursor.
+    const readBatch = async (cursor: string | null): Promise<{ data: SitemapBatch | null; error: unknown }> =>
+      supabase.rpc("get_public_sitemap_articles", { p_after_slug: cursor, p_limit: PAGE_SIZE });
     const entries: MetadataRoute.Sitemap = [{ url: SITE_URL }];
-    const candidates: SitemapRow[] = [];
     const seen = new Set<string>();
     let after: string | null = null;
     while (true) {
       if (Date.now() >= deadline) throw new Error("Sitemap read timed out");
-      const { data, error } = await supabase.rpc("get_sitemap_candidates", { p_after_slug: after, p_limit: PAGE_SIZE });
-      if (error || !Array.isArray(data) || data.length > PAGE_SIZE) throw new Error("Sitemap read failed");
-      if (data.length === 0) break;
+      const response = await readBatch(after);
+      const data: SitemapBatch | null = response.data;
+      const error: unknown = response.error;
+      if (error || !data || !Array.isArray(data.articles) || data.articles.length > PAGE_SIZE
+        || typeof data.has_more !== "boolean") throw new Error("Sitemap read failed");
+      const rows = data.articles as SitemapRow[];
+      const cursor: unknown = data.next_after_slug;
+      if (cursor === null) {
+        if (rows.length || data.has_more) throw new Error("Invalid empty sitemap batch");
+        break;
+      }
+      if (typeof cursor !== "string" || !cursor || (after !== null && cursor <= after)) throw new Error("Invalid sitemap cursor");
       let previous: string = after ?? "";
-      for (const row of data as SitemapRow[]) {
+      for (const row of rows) {
         if (!row || typeof row.slug !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,199}$/.test(row.slug)
-          || row.slug < previous) throw new Error("Invalid sitemap row");
+          || row.slug < previous || row.slug > cursor) throw new Error("Invalid sitemap row");
         previous = row.slug;
         const url = articleCanonicalUrl(row.slug);
         if (seen.has(url)) continue;
@@ -37,29 +48,12 @@ export async function loadSitemap(): Promise<MetadataRoute.Sitemap> {
         const modified = row.last_modified;
         if (modified !== null && (typeof modified !== "string" || !Number.isFinite(Date.parse(modified))
           || Date.parse(modified) > Date.now())) throw new Error("Invalid sitemap timestamp");
-        if (typeof row.content_hash !== "string" || !/^[a-f0-9]{32}$/.test(row.content_hash)) throw new Error("Invalid fingerprint");
-        candidates.push(row);
+        entries.push({ url, ...(modified ? { lastModified: new Date(modified) } : {}) });
       }
-      if (previous === after) throw new Error("Sitemap cursor did not advance");
-      after = previous;
-      if (data.length < PAGE_SIZE) break;
+      after = cursor;
+      if (!data.has_more) break;
     }
-    const reasons: Record<string, number> = {};
-    // Bounded concurrency avoids a burst of public page requests. A cold cache
-    // that cannot complete in budget fails, never publishes a truncated sitemap.
-    for (let offset = 0; offset < candidates.length; offset += 4) {
-      if (Date.now() >= deadline - 6000) throw new Error("Sitemap verification budget exceeded");
-      const batch = candidates.slice(offset, offset + 4);
-      const verdicts = await Promise.all(batch.map(row => verifyPublicPage(row.slug, row.content_hash)));
-      for (let i = 0; i < batch.length; i++) {
-        const row = batch[i];
-        const verdict = verdicts[i];
-        reasons[verdict] = (reasons[verdict] ?? 0) + 1;
-        if (verdict === "eligible") entries.push({ url: articleCanonicalUrl(row.slug),
-          ...(row.last_modified ? { lastModified: new Date(row.last_modified) } : {}) });
-      }
-    }
-    console.info("[seo-sitemap]", JSON.stringify({ candidates: candidates.length, includedVideos: entries.length - 1, reasons }));
+    console.info("[seo-sitemap]", JSON.stringify({ includedVideos: entries.length - 1, policy: "public-default" }));
     return entries;
   } catch {
     // Never turn a DB error/missing migration into a successful homepage-only or
