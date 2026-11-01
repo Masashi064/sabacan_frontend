@@ -1,7 +1,9 @@
 // src/app/page.tsx
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { SITE_URL } from "@/lib/seo/urls";
+import { notFound } from "next/navigation";
+import { homeMetadata, homePageNumber } from "@/lib/home/pagination";
+import { Pagination } from "@/components/home/Pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ArticleCardData } from "@/components/ArticleCard";
@@ -9,7 +11,7 @@ import { ArticleFilters } from "@/components/ArticleFilters";
 import { MobileFiltersSheet } from "@/components/home/MobileFiltersSheet";
 import { ArticleGrid } from "@/components/home/ArticleGrid";
 import { FilterStatus } from "@/components/home/FilterStatus";
-import { RecommendationsSkeleton, HomeContentSkeleton } from "@/components/home/HomeSkeletons";
+import { RecommendationsSkeleton } from "@/components/home/HomeSkeletons";
 
 import { getHomeData } from "@/lib/home/homeService";
 import { getRecommendedArticles } from "@/lib/home/recommendations";
@@ -17,7 +19,12 @@ import { RecommendationsSection } from "@/components/home/RecommendationsSection
 import type { HomeSearchParams } from "@/lib/home/types";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { alternates: { canonical: SITE_URL } };
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<HomeSearchParams> }): Promise<Metadata> {
+  const sp = (await searchParams) ?? {};
+  const page = homePageNumber(sp.page);
+  if (page === null) notFound();
+  return homeMetadata(sp, page);
+}
 
 export default async function Home({
   searchParams,
@@ -25,7 +32,10 @@ export default async function Home({
   searchParams?: Promise<HomeSearchParams>;
 }) {
   const sp = (await searchParams) ?? {};
+  if (homePageNumber(sp.page) === null) notFound();
   const supabase = await supabaseServer();
+  // Resolve the grid before streaming so it and its links are visible without JS.
+  const content = await HomeContent({ supabase, sp });
 
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
@@ -35,9 +45,7 @@ export default async function Home({
       </Suspense>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <Suspense fallback={<HomeContentSkeleton />}>
-          <HomeContent supabase={supabase} sp={sp} />
-        </Suspense>
+        {content}
       </div>
     </main>
   );
@@ -57,6 +65,10 @@ async function HomeContent({
 }) {
   const { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError } =
     await getHomeData(supabase, sp);
+
+  const page = homePageNumber(sp.page) ?? 1;
+  const totalPages = Math.max(1, Math.ceil(totalCount / 24));
+  if (!fetchError && page > totalPages) notFound();
 
   const articles: ArticleCardData[] = rows.map((row) => ({
     slug: row.slug,
@@ -110,8 +122,10 @@ async function HomeContent({
           key={JSON.stringify(sp)}
           initialItems={articles}
           initialHasMore={hasMore}
+          initialPage={page}
           searchParams={sp}
         />
+        {!fetchError ? <Pagination page={page} totalPages={totalPages} searchParams={sp} /> : null}
       </div>
     </>
   );

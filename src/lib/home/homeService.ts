@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { homePageNumber } from "./pagination";
 import type { HomeData, HomeSearchParams, CategoryRow } from "./types";
 
 export const PAGE_SIZE = 24;
@@ -104,7 +105,7 @@ async function fetchArticleRows(
   pageSize: number
 ): Promise<{ rows: CategoryRow[]; hasMore: boolean; totalCount: number; fetchError: string | null }> {
   const q = (sp.q ?? "").trim();
-  const sort = (sp.sort ?? "published_date") as "published_date" | "created_at";
+  const sort = sp.sort === "created_at" ? "created_at" : "published_date";
   const order = (sp.order ?? "desc") as "asc" | "desc";
   const channel = (sp.channel ?? "all").trim();
   const category = (sp.category ?? "all").trim();
@@ -162,7 +163,8 @@ async function fetchArticleRows(
   }
 
   const { data, count, error } = await qb
-    .order(sort, { ascending: order === "asc" })
+    .order(sort, { ascending: order === "asc", nullsFirst: false })
+    .order("slug", { ascending: true })
     .range(from, from + fetchSize - 1);
 
   if (error) {
@@ -181,7 +183,7 @@ async function fetchArticleRows(
   return { rows, hasMore, totalCount, fetchError: null };
 }
 
-// Used by the home page server component: fetches filter options + first page in parallel.
+// Used by the home page server component: fetches filter options + the requested page in parallel.
 export async function getHomeData(
   supabase: SupabaseClient,
   sp: HomeSearchParams
@@ -206,7 +208,7 @@ export async function getHomeData(
           return [[], [], []] as [string[], string[], string[]];
         }
       }),
-      fetchArticleRows(supabase, sp, 0, PAGE_SIZE),
+      fetchArticleRows(supabase, sp, (homePageNumber(sp.page) ?? 1) - 1, PAGE_SIZE),
     ]);
 
   return { channelOptions, categoryOptions, levelOptions, rows, hasMore, totalCount, fetchError };

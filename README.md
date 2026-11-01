@@ -141,3 +141,31 @@ EXECUTE privileges; review that internal helper's access separately. No write
 RPC was invoked to test exploitation and no Coin/Achievement behavior changed.
 A complete fresh-environment baseline and legacy migration-history reconciliation
 remain separate projects; do not claim the eleven files bootstrap an empty DB.
+
+## SEO Phase 2B: crawlable video pages
+
+`/` serves the first 24 videos; `/?page=2`, `/?page=3`, etc. serve subsequent
+24-row windows from the same RLS-scoped query as infinite scroll. Normal
+previous/next links work without JavaScript. The grid is resolved before
+streaming (the homepage loading boundary was removed), so the cards and
+navigation are visible without client script execution. Recommendations remain
+independently streamed and their RPC is unchanged.
+
+Ordering uses the selected date with nulls last, then unique slug ascending to
+stabilize ties. Infinite scroll starts after the requested SSR page and removes
+duplicate slugs on append. No snapshot tables or DB changes were added. As with
+ordinary offset pagination, concurrent catalog inserts/deletes can shift later
+windows; page requests do not promise a frozen catalog.
+
+Each default public page has a self Canonical. Search, filter, completion and
+alternative-sort variants have noindex/follow and normalized self Canonicals;
+this does not apply noindex to individual videos. Filter changes start at page 1.
+Only approved videos appear in the sitemap; normal public browsing remains
+available for the existing catalog.
+
+Run `pnpm test:pagination` and, against a production build on port 3115,
+`pnpm test:pagination:http`. Set `SEO_TEST_BASE_URL` explicitly for production.
+The HTTP checks inspect server HTML, three disjoint 24-video windows, bot parity,
+sequential hrefs, Canonicals, and filtered noindex variants. Browser checks must
+add JavaScript-disabled navigation, responsive layout, infinite scroll from a
+non-first page, and existing learning-tab interactions.

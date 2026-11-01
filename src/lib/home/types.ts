@@ -1,4 +1,5 @@
 export type HomeSearchParams = {
+  page?: string;
   q?: string;
   sort?: "published_date" | "created_at";
   order?: "asc" | "desc";

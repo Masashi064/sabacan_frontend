@@ -7,16 +7,18 @@ import type { HomeSearchParams } from "@/lib/home/types";
 export function ArticleGrid({
   initialItems,
   initialHasMore,
+  initialPage,
   searchParams,
 }: {
   initialItems: ArticleCardData[];
   initialHasMore: boolean;
+  initialPage: number;
   searchParams: HomeSearchParams;
 }) {
   const [items, setItems] = useState(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
-  const pageRef = useRef(1); // page 0 was already rendered by the server
+  const pageRef = useRef(initialPage); // next zero-based API page after the SSR page
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +42,14 @@ export function ArticleGrid({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json() as { rows: ArticleCardData[]; hasMore: boolean };
 
-      setItems((prev) => [...prev, ...json.rows]);
+      setItems((prev) => {
+        const seen = new Set(prev.map((item) => item.slug));
+        return [...prev, ...json.rows.filter((item) => {
+          if (seen.has(item.slug)) return false;
+          seen.add(item.slug);
+          return true;
+        })];
+      });
       setHasMore(json.hasMore);
       pageRef.current += 1;
     } catch (err) {
@@ -79,7 +88,7 @@ export function ArticleGrid({
 
   return (
     <div className="space-y-6 animate-in fade-in-0 duration-200">
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section data-slot="article-grid" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((a) => (
           <ArticleCard key={a.slug} article={a} href={`/articles/${a.slug}`} />
         ))}
