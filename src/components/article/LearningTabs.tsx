@@ -39,22 +39,26 @@ export function LearningTabs({
     <Card className="learning-card gap-0 py-0">
       <Tabs value={tab} onValueChange={setTab} className="gap-0">
         <CardHeader className="min-w-0 border-b px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            <TabsList variant="line" className="min-w-0 max-w-full justify-start overflow-x-auto">
-              <TabsTrigger value="quiz">Quiz</TabsTrigger>
-              <TabsTrigger value="vocabulary">Vocabulary</TabsTrigger>
-              <TabsTrigger value="transcript">Transcript</TabsTrigger>
-              <TabsTrigger value="ask-ai"><Sparkles className="size-3" aria-hidden="true" />Ask AI</TabsTrigger>
-            </TabsList>
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="learning-tabs-scroller">
+              <TabsList variant="line" className="learning-tabs-list">
+                <TabsTrigger value="quiz">Quiz</TabsTrigger>
+                <TabsTrigger value="vocabulary">Vocabulary</TabsTrigger>
+                <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                <TabsTrigger value="ask-ai"><Sparkles className="size-3" aria-hidden="true" />Ask AI</TabsTrigger>
+              </TabsList>
+            </div>
 
-            {tab === "quiz" && progress ? (
-              <span className="text-sm text-muted-foreground">
-                {progress.current} / {progress.total}
-              </span>
-            ) : null}
-            {tab === "transcript" && transcriptParagraphs.length > 0 ? (
-              <CopyButton text={transcriptParagraphs.join("\n\n")} />
-            ) : null}
+            <div className="flex h-7 w-20 shrink-0 items-center justify-end">
+              {tab === "quiz" && progress ? (
+                <span className="text-sm text-muted-foreground">
+                  {progress.current} / {progress.total}
+                </span>
+              ) : null}
+              {tab === "transcript" && transcriptParagraphs.length > 0 ? (
+                <CopyButton text={transcriptParagraphs.join("\n\n")} />
+              ) : null}
+            </div>
           </div>
         </CardHeader>
 

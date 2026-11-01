@@ -317,3 +317,23 @@
     overflow: hidden;
   }
 }
+
+/* Keep the active underline inside the tab strip. Only its outer wrapper
+   scrolls horizontally, so fixed tab heights cannot create vertical overflow. */
+.learning-card .learning-tabs-scroller {
+  min-inline-size: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.learning-card [data-slot="tabs-list"].learning-tabs-list {
+  block-size: 40px;
+  min-block-size: 40px;
+  padding: 3px 3px 8px;
+  justify-content: flex-start;
+}
+
+.learning-card .learning-tabs-list > [data-slot="tabs-trigger"] {
+  block-size: 29px;
+  flex: none;
+}
