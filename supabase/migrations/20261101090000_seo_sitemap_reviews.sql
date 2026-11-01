@@ -52,16 +52,11 @@ create function public.get_sitemap_articles(p_after_slug text default null, p_li
 returns table (slug text, last_modified timestamptz)
 language sql stable security definer
 set search_path = ''
--- A logged-in RPC caller must not broaden this public projection via auth.uid().
--- Function SET values are restored automatically on exit.
-set "request.jwt.claims" = '{"role":"anon"}'
-set "request.jwt.claim.sub" = ''
-set "request.jwt.claim.role" = 'anon'
 as $$
   select r.slug, r.content_updated_at
   from public.article_seo_reviews r
   join public.categories c on c.slug = r.slug
-  where r.status = 'approved' and r.public_access_confirmed
+  where auth.uid() is null and r.status = 'approved' and r.public_access_confirmed
     and r.quality_approved and r.rights_approved and r.reviewed_at is not null
     and c.video_id ~ '^[A-Za-z0-9_-]{11}$'
     and length(btrim(c.video_title)) > 0
@@ -88,7 +83,7 @@ alter function public.get_sitemap_articles(text, integer) owner to sabacan_sitem
 revoke create on schema public from sabacan_sitemap_reader;
 revoke sabacan_sitemap_reader from current_user;
 revoke all on function public.get_sitemap_articles(text, integer) from public, anon, authenticated;
-grant execute on function public.get_sitemap_articles(text, integer) to anon, authenticated;
+grant execute on function public.get_sitemap_articles(text, integer) to anon;
 
 -- Fail safely if inherited/default privileges differ from the expected model.
 -- Run the migration atomically (CLI transaction or explicit SQL Editor BEGIN).

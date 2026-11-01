@@ -73,14 +73,14 @@ test('existing content table columns and RLS policies are unchanged',async()=>{
 });
 
 
-test('authenticated JWT cannot widen the public RPC; caller claims are restored on exit',async()=>{
+test('even inherited anon execution cannot expose data to authenticated subjects',async()=>{
  const uid='00000000-0000-0000-0000-000000000001';
+ await db.exec('grant anon to authenticated');
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[uid]);
  await db.exec('set role authenticated');
  try{
   assert.equal((await db.query("select slug from public.categories where slug='user-only'")).rows.length,1);
-  const rows=(await db.query('select * from public.get_sitemap_articles()')).rows;
-  assert.equal(rows.some(row=>row.slug==='user-only'),false);
+  assert.equal((await db.query('select * from public.get_sitemap_articles()')).rows.length,0);
   assert.equal((await db.query("select current_setting('request.jwt.claim.sub') as uid")).rows[0].uid,uid);
- }finally{await db.exec("reset role; select set_config('request.jwt.claim.sub','',false)");}
+ }finally{await db.exec("reset role; revoke anon from authenticated; select set_config('request.jwt.claim.sub','',false)");}
 });

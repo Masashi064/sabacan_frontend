@@ -86,72 +86,58 @@ Run `pnpm test:sitemap` and `pnpm test:sitemap:sql`. After deployment, run
 robots, and each listed URL's status and Canonical. This HTTP check does not
 itself establish rights or learning quality; those require the review records.
 
-### Phase 2A production migration gate
+### SEO-only deployment and legacy migrations
 
-The original un-applied `20261101_seo_sitemap_reviews.sql` was renamed to
-`20261101090000_seo_sitemap_reviews.sql`: its old version collided with the Ask AI
-migration. Several older files also share `20260625`. Do not rename or repair
-those old files based only on their filenames; compare remote migration history
-and actual database objects first. No production migration has been applied by
-this implementation.
+Do NOT run a normal `supabase db push` against production in this repository.
+The eleven older SQL files were manually executed in SQL Editor, and are not
+tracked by the CLI migration history. Their original names and SQL bytes are
+preserved, including duplicate legacy version prefixes. Do not re-run them,
+repair their history, or use `--include-all` as part of an SEO deployment.
 
-Use an authenticated Supabase CLI and the verified production connection:
-
-```bash
-supabase migration list --db-url "$SUPABASE_DB_URL"
-supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
-```
-
-These are inspection commands only. Do not run `db push`, `--include-all`,
-`db reset`, `migration up`, or history repair until the pending migration list
-has been reconciled and the exact execution set reviewed and reported. Expected new execution
-set is ONLY `20261101090000_seo_sitemap_reviews.sql`, with no seed approvals.
-Use `supabase/seo_preflight.sql` to inspect existing objects, permissions, content
-schema/RLS, and the existence of the migration history table. Compare policies
-before/after; do not paste connection passwords into chat or commit them.
-
-If SQL Editor is required, run the exact reviewed migration inside one explicit
-`BEGIN` / `COMMIT` transaction after checking that its new objects do not already
-exist. If statements fail, `ROLLBACK`; do not continue a partial application.
-Verify schema, function owner/search_path, permissions, existing content RLS, and
-anonymous RPC results before marking ONLY the new version as applied:
+Apply ONLY `20261101090000_seo_sitemap_reviews.sql` through an authenticated DB
+connection/SQL Editor, inside an explicit BEGIN/COMMIT transaction. Inspect
+`supabase/seo_preflight.sql`, verify target objects are absent, and confirm a
+completed physical backup and restore access first. On any SQL error, ROLLBACK.
+Never continue partial DDL. After verifying the new objects and permissions,
+record ONLY this version with:
 
 ```bash
-supabase migration repair 20261101090000 --status applied --db-url "$SUPABASE_DB_URL"
-supabase migration list --db-url "$SUPABASE_DB_URL"
+supabase migration repair 20261101090000 --status applied --linked
+supabase migration list --linked
 ```
 
-`migration repair` records history; it does not execute the migration. Never mark
-other migrations applied without comparing their effects to the live schema. If
-history recording fails after manual application, report that split state and do
-not rerun CREATE statements or deploy blindly. Confirm database changes and
-history before pushing the app commit that enables sitemap generation.
+The expected remote history contains only the SEO version. This deliberately
+leaves unrelated historical migration bookkeeping unresolved. No old migration
+is being represented as applied by this release. No approval rows are seeded.
 
-The RPC now uses SECURITY DEFINER under `sabacan_sitemap_reader`, a dedicated
+The RPC uses SECURITY DEFINER under `sabacan_sitemap_reader`, a dedicated
 NOLOGIN/NOBYPASSRLS role inheriting only anon content access. It has read-only
 access to approved review projections, not evidence, and cannot create public
-objects after setup. General users have no table or column access to review
-states/evidence. Public EXECUTE is revoked; anon/authenticated receive EXECUTE
-only on the fixed, parameterized URL projection. No dynamic SQL is used. The
-function has an empty search_path and fully qualified table references. Function-local
-JWT claims are fixed to anon (with no user ID) and restored on exit, so even an
-authenticated caller cannot widen the public projection via auth.uid(). No
-existing content policies or ownership are changed.
+objects after setup. General users have no direct access to review states or
+evidence. PUBLIC and explicit authenticated EXECUTE are revoked; execution is granted to
+anon only. An existing authenticated-to-anon inheritance may still confer EXECUTE,
+but the function returns no rows for any non-null auth.uid(). No dynamic SQL is used. Empty search_path and fully
+qualified table references prevent object substitution. The query additionally
+requires auth.uid() IS NULL; it never changes request JWT settings. Existing content policies and ownership are unchanged.
 
-Security Advisor may flag 0028/0029 because anon/authenticated can execute this
-SECURITY DEFINER function. The intentional public projection must be reviewed
-against its restricted owner, return fields, and permissions; do not suppress the
-finding without inspection. Search-path mutability (0011) is addressed explicitly.
-Run the actual Advisor after deployment; local PostgreSQL tests are not an Advisor
-report. An unused-index observation may occur before sitemap traffic starts.
+Security Advisor can flag 0028/0029 for this intentionally public definer RPC;
+review the restricted owner, grants, and return fields rather than hiding the
+finding. Search-path mutability is explicitly addressed. A cold DB error fails
+sitemap generation; successful cached data is never replaced by a partial read.
 
-Before approving the first 20–50 videos, verify each exact slug, anonymous HTTP
-200 and Canonical, functioning video, quiz/vocabulary accuracy, and permission
-for currently published transcript/learning-material reuse. Record concrete
-sources/permission evidence and the review date privately. Approve only exact
-reviewed slugs, in an administrator transaction: rehearse with ROLLBACK, compare
-approved count and RPC projection, then COMMIT the verified batch. Never use an
-unqualified UPDATE, blanket channel approval, or a target-count-driven approval.
-Do not seed fake approvals in production to test the approved/error cases; use
-an isolated test database, and test production approved rows only once genuinely
-reviewed material exists. Sitemap omission does not resolve publication rights.
+Recovery: a failed transaction leaves no partial SEO objects. If the app release
+fails after DB success, roll the Vercel app back to Phase 1 and retain the new,
+additive DB objects and any review evidence. Full physical-backup restoration
+requires a maintenance window and may lose changes since the backup (PITR was
+not enabled at preflight); it is an emergency option, not a routine rollback.
+Never reset production or remove existing content/Auth/RLS for SEO recovery.
+
+### Deferred non-SEO issues
+
+Production `get_recommended_articles(integer)` matches the initial recommendation
+function, not the later category/history/reason-label revisions. Its definition
+has not been modified by this SEO release. `_ach_unlock` also has anonymous
+EXECUTE privileges; review that internal helper's access separately. No write
+RPC was invoked to test exploitation and no Coin/Achievement behavior changed.
+A complete fresh-environment baseline and legacy migration-history reconciliation
+remain separate projects; do not claim the eleven files bootstrap an empty DB.
