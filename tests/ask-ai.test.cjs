@@ -48,6 +48,7 @@ function api(overrides = {}) {
   const route = compile('src/app/api/ask-ai/route.ts', {
     openai: {default:OpenAI}, 'next/server':{NextResponse:{json:(body,init)=>Response.json(body,init)}},
     '@/lib/supabase/server':{supabaseServer:async()=>db}, '@/lib/ask-ai/shared':shared,
+    '@/lib/ask-ai/prompt':compile('src/lib/ask-ai/prompt.ts', {}),
     '@/lib/transcript/parseVtt':{parseVttToParagraphs:()=>['caption'],parseTranscriptJsonToParagraphs:()=>['Approved caption'.repeat(1000)]},
   }, {Buffer, URL, process:{env:{OPENAI_API_KEY:overrides.noKey?undefined:'test-secret',ASK_AI_INCLUDE_TRANSCRIPT:overrides.transcript?'true':undefined}}, });
   return { calls, queries, post: (body=valid, options={})=>route.POST(new Request('https://example.test/api/ask-ai',{method:'POST',headers:{'Content-Type':'application/json',...options.headers},body:typeof body === 'string'?body:JSON.stringify(body)})) };

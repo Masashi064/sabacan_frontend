@@ -38,6 +38,7 @@
 - `src/components/article/LearningTabs.tsx`: 第4タブ、状態保持、狭い画面でのタブ横スクロール。
 - `src/components/article/AskAIChat.tsx`: チャットUI・送信・再試行。
 - `src/app/api/ask-ai/route.ts`: 認証・検証・動画取得・OpenAI連携。
+- `src/lib/ask-ai/prompt.ts`: AIチューターのプロンプト。内容の調整はこのファイルで行う。
 - `src/lib/ask-ai/shared.ts`: 共通型・上限・履歴切り詰め・リクエスト検証。
 - `src/app/globals.css`: PCのAsk AIパネル内部スクロール。
 - `supabase/migrations/20261101_ask_ai_rate_limits.sql`: 共有レート制限。
