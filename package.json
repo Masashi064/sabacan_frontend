@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test:learning": "node tests/learning-stats.test.cjs",
-    "test:ask-ai": "node tests/ask-ai.test.cjs"
+    "test:ask-ai": "node tests/ask-ai.test.cjs",
+    "test:seo": "node tests/article-seo.test.cjs",
+    "test:seo:http": "node tests/article-seo-http.test.cjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
