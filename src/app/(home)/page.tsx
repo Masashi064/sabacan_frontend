@@ -1,5 +1,7 @@
 // src/app/page.tsx
 import { Suspense } from "react";
+import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/seo/urls";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { ArticleCardData } from "@/components/ArticleCard";
@@ -15,6 +17,7 @@ import { RecommendationsSection } from "@/components/home/RecommendationsSection
 import type { HomeSearchParams } from "@/lib/home/types";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: SITE_URL } };
 
 export default async function Home({
   searchParams,

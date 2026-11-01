@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import type { ArticleData } from "./getArticleData";
 
-const SITE_URL = "https://sabacan365.com";
+import { SITE_URL, articleCanonicalUrl } from "@/lib/seo/urls";
 const clean = (value: string | null) => value?.replace(/\s+/g, " ").trim() ?? "";
 
 export function buildArticleMetadata({ category, quizList, vocabItems, transcriptParagraphs }: ArticleData): Metadata {
   const videoTitle = clean(category.video_title) || category.slug;
   const title = `${videoTitle} | English Listening Practice | Sabacan365`;
-  const canonical = `${SITE_URL}/articles/${encodeURIComponent(category.slug)}`;
+  const canonical = articleCanonicalUrl(category.slug);
   const channel = clean(category.channel_name);
   const details = [clean(category.assigned_category), clean(category.assigned_level)].filter(Boolean);
   const activities = [quizList.length ? "quiz" : null, vocabItems.length ? "vocabulary" : null,

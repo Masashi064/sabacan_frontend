@@ -2,7 +2,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const ts=require('typescript');const fs=require('node:fs');const vm=require('node:vm');
 function compile(file,imports){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,{exports,URL,require:name=>{if(!(name in imports))throw Error(`Unexpected import ${name}`);return imports[name];}});return exports;}
-const {buildArticleMetadata}=compile('src/lib/articles/metadata.ts',{});
+const {buildArticleMetadata}=compile('src/lib/articles/metadata.ts',{'@/lib/seo/urls':compile('src/lib/seo/urls.ts',{})});
 const category={slug:'lesson-1',video_id:'abcdefghijk',video_title:'Real video title',channel_name:'Real channel',assigned_category:'Business',assigned_level:'intermediate',thumbnail_url:'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',published_date:'2026-10-31',video_length:'1:47'};
 const article={category,quizList:[{question:'Q',choices:['A'],answer:'A'}],vocabItems:[{word:'word'}],transcriptParagraphs:['Transcript.']};
 test('video metadata is unique, canonical, factual and overrides social metadata',()=>{

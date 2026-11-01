@@ -10,7 +10,10 @@
     "test:learning": "node tests/learning-stats.test.cjs",
     "test:ask-ai": "node tests/ask-ai.test.cjs",
     "test:seo": "node tests/article-seo.test.cjs",
-    "test:seo:http": "node tests/article-seo-http.test.cjs"
+    "test:seo:http": "node tests/article-seo-http.test.cjs",
+    "test:sitemap": "node tests/sitemap.test.cjs",
+    "test:sitemap:sql": "node tests/sitemap-sql.test.cjs",
+    "test:sitemap:http": "node tests/sitemap-http.test.cjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -34,6 +37,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
