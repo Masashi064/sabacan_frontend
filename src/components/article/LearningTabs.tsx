@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Sparkles } from "lucide-react";
+import { AskAIChat } from "@/components/article/AskAIChat";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +29,7 @@ export function LearningTabs({
   vocabItems: VocabItem[];
   transcriptParagraphs: string[];
 }) {
+  const { user } = useAuth();
   const [tab, setTab] = React.useState("quiz");
   const [progress, setProgress] = React.useState<{ current: number; total: number } | null>(
     null
@@ -34,12 +38,13 @@ export function LearningTabs({
   return (
     <Card className="learning-card gap-0 py-0">
       <Tabs value={tab} onValueChange={setTab} className="gap-0">
-        <CardHeader className="border-b px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <TabsList variant="line">
+        <CardHeader className="min-w-0 border-b px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <TabsList variant="line" className="min-w-0 max-w-full justify-start overflow-x-auto">
               <TabsTrigger value="quiz">Quiz</TabsTrigger>
               <TabsTrigger value="vocabulary">Vocabulary</TabsTrigger>
               <TabsTrigger value="transcript">Transcript</TabsTrigger>
+              <TabsTrigger value="ask-ai"><Sparkles className="size-3" aria-hidden="true" />Ask AI</TabsTrigger>
             </TabsList>
 
             {tab === "quiz" && progress ? (
@@ -111,6 +116,9 @@ export function LearningTabs({
                 Transcript is not available yet for this article.
               </p>
             )}
+          </TabsContent>
+          <TabsContent value="ask-ai" forceMount className={tab === "ask-ai" ? "ask-ai-panel" : "ask-ai-panel hidden"}>
+            <AskAIChat key={`${videoId ?? slug}:${user?.id ?? "guest"}`} videoId={videoId} signedIn={!!user} />
           </TabsContent>
         </CardContent>
       </Tabs>

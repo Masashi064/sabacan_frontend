@@ -311,3 +311,9 @@
 @media (max-width: 360px) {
   .reward-value-number { inline-size: 2ch; }
 }
+
+@media (min-width: 1024px) {
+  .article-learning-panel .ask-ai-panel {
+    overflow: hidden;
+  }
+}
